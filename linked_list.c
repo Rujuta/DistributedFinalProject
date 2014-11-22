@@ -1,11 +1,14 @@
-#include "linked_list.h"
-#include "net_include_common.h"
+#include "structures.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+//#include "net_include.h"
 
 /*Allocate memory for a node in the list*/
-node* get_node(list_type type,void *content){
+node* get_node(list_type type){
 
-	void *data=NULL;
-	node* linked_list_node = NULL;
+	void *data;
+	node* linked_list_node;
 	switch(type){
 
 		case LIST_UPDATE:data= (update*)malloc(sizeof(update));
@@ -20,9 +23,9 @@ node* get_node(list_type type,void *content){
 
 	}
 
-	data->next=NULL;
-	linked_list_node = malloc(sizeof(node));
-	linked_list_node->data=data;
+	linked_list_node = (node*)malloc(sizeof(node));
+	linked_list_node->data=data; //i think this should be memcpy
+	linked_list_node->next=NULL;
 	return linked_list_node;
 }
 
@@ -35,30 +38,13 @@ linked_list* get_linked_list(list_type type){
 	return new_list;
 }
 
-/*Allocates space for a line by calling getnode and assigns the values
- * specific to that line*/
-node* create_line(char* user, char* message, int likes, int line_no, LTS lts){
-
-	node *new_node=get_node(LIST_LINE);	
-	sprintf(new_node->data->line_content.line_packet_user,user);
-	sprintf(new_node->data->line_content.message,message);
-	new_node->data->line_content.line_packet_likes=likes;
-	new_node->data->line_content.line_packet_line_no=line_no;
-	new_node->data->line_content.line_packet_LTS.LTS_counter=lts.LTS_counter;
-	new_node->data->line_content.line_packet_LTS.LTS_server_id=lts.LTS_server_id;
-
-	linked_list* line_meta=get_linked_list(LIST_META);
-	new_node->data->line_meta=line_meta;
-	return new_node;
-
-
-}
-
 /*Appends a node to the end of a linkedlist*/
 void append(linked_list *list, node* new_node){
 
-			if(is_empty(list)){
+	printf("\nEntered Append\n");
+	if(is_empty(list)){
 		list->head=new_node;
+
 
 	}
 	else{
@@ -68,117 +54,120 @@ void append(linked_list *list, node* new_node){
 	}
 	list->tail=new_node;
 
+	printf("\nLeaving append\n");
+}
+
+/*Checks if a list is empty*/
+int is_empty(linked_list *list){
+
+	printf("\nIn is empty\n");
+	if (list->head==NULL)
+		return 1;
+	else
+		return 0;
+
+}
+
+/*Create a node of type meta*/
+node* create_meta(char* user_name){
+
+	printf("\n entered create_meta");
+	node *new_node=get_node(LIST_META);	
+	meta* my_meta;
+	my_meta=(meta*)new_node->data;
+	sprintf(my_meta->meta_user,user_name);
+	return new_node;
 
 }
 
 /*Creates a node which is of type update for the update list and returns that node*/
 node* create_update( request update_type, LTS lts, char* chat_room, union_update_data data){
 
+	static int i=2;
 	node *new_node=get_node(LIST_UPDATE);	
-	sprintf(new_node->data->update_chat_room,chat_room);
-	new_node->data->update_type=update_type;
-	new_node->data->update_LTS.LTS_counter=lts.LTS_counter;
-	new_node->data->update_LTS.LTS_server_id=lts.LTS_server_id;
+	update* my_data=(update*)new_node->data;
+	sprintf(my_data->update_chat_room,chat_room);
+	my_data->update_type=update_type;
+	my_data->update_lts.LTS_counter= i;//lts.LTS_counter;
+	i++;
+	my_data->update_lts.LTS_server_id=lts.LTS_server_id;
 
-	union_update_data* union_data = (union_update_data*)malloc(sizeof(union_update_data));
-		
-	memcpy(&(union_data),data,sizeof(union_data));
+	//allocate space for the union 
+	//union_update_data* union_data = (union_update_data*)malloc(sizeof(union_update_data));
+
+	// this will be switched by type
+	memcpy(&(my_data->update_data.data_like),&data,sizeof(union_update_data));
+	
+	//my_data->update_data
 	return new_node;
 
 
 }
 
-node* create_meta(char* meta){
-	
-	node *new_node=get_node(LIST_META);	
-	sprintf(new_node->data->meta_user,meta);
+/*Allocates space for a line by calling getnode and assigns the values
+ * specific to that line*/
+node* create_line(char* user, char* message, int likes, int line_no, LTS lts){
+
+	static int i=1;
+	node *new_node=get_node(LIST_LINE);
+	line* my_data=(line*)new_node->data;
+	sprintf(my_data->line_content.line_packet_user,user);
+	sprintf(my_data->line_content.line_packet_message,message);
+	my_data->line_content.line_packet_likes=likes;
+	my_data->line_content.line_packet_line_no=line_no;
+	my_data->line_content.line_packet_lts.LTS_counter=i;//lts.LTS_counter;
+	i++;
+	my_data->line_content.line_packet_lts.LTS_server_id=lts.LTS_server_id;
+
+	linked_list* meta_ll=get_linked_list(LIST_META);
+	my_data->line_meta=meta_ll;
 	return new_node;
 
-}
-/*Checks if a list is empty*/
-int is_empty(linked_list *list){
-
-	if (list->head!=NULL)
-		return 0;
-	else
-		return 1;
 
 }
 
-/*Deletes a node from the list. Arguments are the list and 
- * the node before the node to be deleted*/
-void delete_from_list(linked_list *list, node* new_node){
+/*Seek for a location in the list, where a node can be inserted*/
+node* seek(linked_list *list, LTS lts){
 
-	node* prev=new_node;
-	prev->next=prev->next->next;
-	free(new_node);
-
-}
-
-
-
-
-/*This will only be a linkedlist of type meta*/
-void delete_meta(linked_list *list,char* username){
-	
-	node* temp= list->head;
-	node* prev=temp;
+	node* prev=list->head;
+	node* temp=prev;
 	while(temp->next!=NULL){
+
 	
-			if(strcmp(username,temp->data->meta_user)==0){
-				if(temp->next == NULL){
-					prev->next == NULL;
-					list->tail == prev;
-					if(temp == list->head){
-						list->head= NULL;
-						list->tail=NULL;
-					}
-
-				}else{
-
-				prev->next=temp->next;
-				if(temp == list->head){
-					list->head = temp->next;
-
-				}
-				}
-				
-				free(temp);
-				
-				break;
-			}else{
-
-				prev = temp;
-				temp = temp->next;
-			}
-	
-	}
-	
-}
-
-/*insert into chat group msgs*/
-void insert_line(linked_list *list, node* new_node, node* location){
-
-	/*first node insertion*/
-	if(location==NULL){
+		switch(list->linked_list_type){
 		
-		new_node->next=list->head;
-		list->head=new_node;
+			case LIST_LINE:
+				;
+				line* my_data;
+				my_data=(line*)temp->data;
+				if(my_data->line_content.line_packet_lts.LTS_counter>lts.LTS_counter){
+			
+					//check if this is the first node
+					if(prev==list->head){
+						return NULL;
+					} 
+					else{
+						return prev;	
+					}
+				}
+				else if(my_data->line_content.line_packet_lts.LTS_counter == lts.LTS_counter){
+
+					if(my_data->line_content.line_packet_lts.LTS_server_id > lts.LTS_server_id){
 	
+					if(prev==list->head){
+						return NULL;
+					}
+				}
+				else{
+					return prev;
+				}
+		}
+				break;
+		}
+		prev= temp;
+		temp=temp->next;
+
 	}
-	else{
-		new_node->next=location->next;
-		location->next=new_node;
-	}
-	if(list->tail==location){
-		list->tail=new_node;	
-	}
+	return list->tail;
 
 }
-
-
-
-
-
-
-
