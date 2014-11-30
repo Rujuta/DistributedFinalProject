@@ -132,10 +132,10 @@ node* seek(linked_list *list, LTS lts , int *ret_val){
 	printf("\n In seek\n");
 	printf("\nLTS server id :%d",lts.LTS_server_id);
 	printf("\nLTS counter id :%d",lts.LTS_counter);
-node* prev=list->head;
+	node* prev=list->head;
 	node* temp=prev;
 	*ret_val=0;
-	while(temp->next!=NULL){
+	while(temp!=NULL){
 
 
 		switch(list->linked_list_type){
@@ -146,7 +146,7 @@ node* prev=list->head;
 				my_data=(line*)temp->data;
 				printf("\nline LTS counter id :%d",my_data->line_content.line_packet_lts.LTS_counter);
 				printf("\nline LTS server id :%d",my_data->line_content.line_packet_lts.LTS_server_id);
-	
+
 				if(my_data->line_content.line_packet_lts.LTS_counter>lts.LTS_counter){
 
 					//check if this is the first node
@@ -174,8 +174,22 @@ node* prev=list->head;
 						if(my_data->line_content.line_packet_lts.LTS_server_id == lts.LTS_server_id){
 
 							*ret_val=1;
+
+
+							printf("\n Server id equal\n");
+
+							if(temp==list->head){
+								return NULL;
+							}
+							else{
+								return prev;
+							}
+						}else{
+
+							printf("\n Server id less\n");
+
+							//return temp;
 						}
-						return prev;
 					}
 				}
 				break;
@@ -184,7 +198,12 @@ node* prev=list->head;
 			case LIST_UPDATE:
 				;
 				update* my_data2;
+
 				my_data2=(update*)temp->data;
+				printf("\nupdate LTS counter id :%d",my_data2->update_lts.LTS_counter);
+				printf("\nupdate LTS server id :%d",my_data2->update_lts.LTS_server_id);
+
+
 				if(my_data2->update_lts.LTS_counter>lts.LTS_counter){
 
 					//check if this is the first node
@@ -199,6 +218,7 @@ node* prev=list->head;
 
 					if(my_data2->update_lts.LTS_server_id > lts.LTS_server_id){
 
+						printf("\n Server id greater\n");
 						if(temp==list->head){
 							return NULL;
 						}
@@ -210,8 +230,23 @@ node* prev=list->head;
 						if(my_data2->update_lts.LTS_server_id == lts.LTS_server_id){
 
 							*ret_val=1;
-						}
-						return prev;
+
+
+							printf("\n Server id equal\n");
+
+							if(temp==list->head){
+								return NULL;
+							}
+							else{
+								return prev;
+							}
+
+						}else{
+
+							printf("\n server id less\n");
+
+							//return temp;
+						}								
 					}
 				}
 				break;
@@ -222,6 +257,7 @@ node* prev=list->head;
 		temp=temp->next;
 
 	}
+	printf("\n returning tail");
 	return list->tail;
 
 }
@@ -295,10 +331,10 @@ void delete(linked_list *list,node* location){
 
 	}
 	else{
-	
+
 		location->next=location->next->next;
 	}
-	
+
 
 }
 
@@ -315,13 +351,13 @@ like_packet create_like_packet(int line_no, LTS lts, char* user){
 
 /*update* create_like_packet(int line_no, LTS lts, char* user){
 
-	like_packet like_pkt;
-	like_pkt.like_packet_line_no=line_no;
-	like_pkt.like_packet_line_no_lts.LTS_counter=lts.LTS_counter;
-	like_pkt.like_packet_line_no_lts.LTS_server_id=lts.LTS_server_id;
-	strcpy(like_pkt.like_packet_user,user);
-	return like_pkt;
+  like_packet like_pkt;
+  like_pkt.like_packet_line_no=line_no;
+  like_pkt.like_packet_line_no_lts.LTS_counter=lts.LTS_counter;
+  like_pkt.like_packet_line_no_lts.LTS_server_id=lts.LTS_server_id;
+  strcpy(like_pkt.like_packet_user,user);
+  return like_pkt;
 
-}
-*/
+  }
+  */
 

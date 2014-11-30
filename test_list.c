@@ -129,7 +129,7 @@ void test_line_list(){
 	linked_list *line_ll, *line_u;
 	line_ll=(linked_list*)get_linked_list(LIST_LINE);
 	line_u=(linked_list*)get_linked_list(LIST_UPDATE);
-	int i=0;
+	int i=1;
 	int lts_cnt=0;
 	node* node_line;
 	/*Create LTS*/
@@ -164,19 +164,154 @@ void test_line_list(){
 	}
 
 	print_line(line_ll);
+ 	
+	print_update(line_u);
 	
 	//print_update(line_u);
 	/*test seek function*/
 	int ret_val;
-	node* seeked_node=(node*)seek(line_ll,create_LTS(3,4),&ret_val);
-	line* my_data=(line*)seeked_node->data;
-	printf("\n\nSeeked LTS counter:%d Seeked LTS server ID:%d ",my_data->line_content.line_packet_lts.LTS_counter,my_data->line_content.line_packet_lts.LTS_server_id);
+	line * my_data;
+	node* seeked_node=(node*)seek(line_ll,create_LTS(5,1),&ret_val);
+	
+	node *  nn;
 
-	/*Seek for something in Update*/
-	node* s = (node*)seek(line_u,create_LTS(6,3),&ret_val);
-	if(ret_val==1){
-		printf("\nGot it\n");
+	
+
+
+
+	if(seeked_node == NULL){
+		printf("\nreturned null by seek --ret val = %d\n",ret_val);
+	}else{
+	my_data=(line*)seeked_node->data;
+	printf("\n\nSeeked LTS counter:%d Seeked LTS server ID:%d and the ret val is %d",my_data->line_content.line_packet_lts.LTS_counter,my_data->line_content.line_packet_lts.LTS_server_id,ret_val);
+ 	}
+	
+	 nn=(node*)create_line("Square Pants","This is my new line message",6,1,create_LTS(5,1));
+
+	insert(line_ll,nn,seeked_node);
+	
+	print_line(line_ll);
+
+	seeked_node=(node*)seek(line_ll,create_LTS(5,3),&ret_val);
+	
+
+	 if(seeked_node == NULL){
+                printf("\nreturned null by seek --ret val = %d\n",ret_val);
+        }else{
+        my_data=(line*)seeked_node->data;
+        printf("\n\nSeeked LTS counter:%d Seeked LTS server ID:%d and the ret val is %d",my_data->line_content.line_packet_lts.LTS_counter,my_data->line_content.line_packet_lts.LTS_server_id,ret_val);
 	}
+
+         nn=(node*)create_line("Square Pants","This is my new line message",6,1,create_LTS(5,3));
+
+        //insert(line_ll,nn,seeked_node);
+
+        print_line(line_ll);
+
+
+ 	seeked_node=(node*)seek(line_ll,create_LTS(5,4),&ret_val);
+       
+	 if(seeked_node == NULL){
+                printf("\nreturned null by seek --ret val = %d\n",ret_val);
+        }else{
+	 my_data=(line*)seeked_node->data;
+         printf("\n\nSeeked LTS counter:%d Seeked LTS server ID:%d and the ret val is %d",my_data->line_content.line_packet_lts.LTS_counter,my_data->line_content.line_packet_lts.LTS_server_id,ret_val);
+	}
+
+         nn=(node*)create_line("Square Pants","This is my new line message",6,1,create_LTS(5,4));
+
+        insert(line_ll,nn,seeked_node);
+
+        print_line(line_ll);
+
+	
+	seeked_node=(node*)seek(line_ll,create_LTS(6,4),&ret_val);
+
+         if(seeked_node == NULL){
+                printf("\nreturned null by seek --ret val = %d\n",ret_val);
+        }else{
+         my_data=(line*)seeked_node->data;
+         printf("\n\nSeeked LTS counter:%d Seeked LTS server ID:%d and the ret val is %d",my_data->line_content.line_packet_lts.LTS_counter,my_data->line_content.line_packet_lts.LTS_server_id,ret_val);
+        }
+
+         nn=(node*)create_line("Square Pants","This is my new line message",6,1,create_LTS(6,4));
+
+        insert(line_ll,nn,seeked_node);
+
+        print_line(line_ll);
+
+
+	printf("\n\n-------Testing update -------\n\n");	
+	
+	/*Seek for something in Update*/
+	node* s ;
+	node * ns;
+	line* lp= (line*)nn->data;
+
+	update * my_data2;
+	union_update_data up;
+        up.data_line=lp->line_content;
+
+
+
+	s=(node*)seek(line_u,create_LTS(6,2),&ret_val);
+
+         if(s== NULL){
+                printf("\nreturned null by seek --ret val = %d\n",ret_val);
+        }else{
+         my_data2=(update*)s->data;
+         printf("\n\nSeeked LTS counter:%d Seeked LTS server ID:%d and the ret val is %d",my_data2->update_lts.LTS_counter,my_data2->update_lts.LTS_server_id,ret_val);
+        }
+
+
+	ns=create_update(MSG,create_LTS(6,2),"chatroom2",up);
+	insert(line_u,ns,s);
+	print_update(line_u);
+
+
+	 s=(node*)seek(line_u,create_LTS(6,3),&ret_val);
+
+         if(s== NULL){
+                printf("\nreturned null by seek --ret val = %d\n",ret_val);
+        }else{
+         my_data2=(update*)s->data;
+         printf("\n\nSeeked LTS counter:%d Seeked LTS server ID:%d and the ret val is %d",my_data2->update_lts.LTS_counter,my_data2->update_lts.LTS_server_id,ret_val);
+        }
+
+	 ns=create_update(MSG,create_LTS(6,2),"chatroom2",up);
+       // insert(line_u,ns,s);
+        print_update(line_u);
+
+	
+
+	 s=(node*)seek(line_u,create_LTS(6,4),&ret_val);
+
+         if(s== NULL){
+                printf("\nreturned null by seek --ret val = %d\n",ret_val);
+        }else{
+         my_data2=(update*)s->data;
+         printf("\n\nSeeked LTS counter:%d Seeked LTS server ID:%d and the ret val is %d",my_data2->update_lts.LTS_counter,my_data2->update_lts.LTS_server_id,ret_val);
+        }
+
+	 ns=create_update(MSG,create_LTS(6,4),"chatroom2",up);
+        insert(line_u,ns,s);
+        print_update(line_u);
+
+
+
+	 s=(node*)seek(line_u,create_LTS(5,4),&ret_val);
+
+         if(s== NULL){
+                printf("\nreturned null by seek --ret val = %d\n",ret_val);
+        }else{
+         my_data2=(update*)s->data;
+         printf("\n\nSeeked LTS counter:%d Seeked LTS server ID:%d and the ret val is %d",my_data2->update_lts.LTS_counter,my_data2->update_lts.LTS_server_id,ret_val);
+        }
+
+	 ns=create_update(MSG,create_LTS(5,4),"chatroom2",up);
+        insert(line_u,ns,s);
+        print_update(line_u);
+	
 
 }
 
@@ -240,8 +375,8 @@ void print_line(linked_list *line_ll){
 		printf("LTS %d, %d Line no: %d ",my_data2->line_content.line_packet_lts.LTS_counter, my_data2->line_content.line_packet_lts.LTS_server_id,my_data2->line_content.line_packet_line_no);
 		printf("Message: %s",my_data2->line_content.line_packet_message);
 		printf("Likes: %d",my_data2->line_content.line_packet_likes);
-		printf("People who liked this:");
-		print_meta(my_data2->line_meta);
+		//printf("People who liked this:");
+		//print_meta(my_data2->line_meta);
 		temp=temp->next;
 	}
 }
