@@ -3,7 +3,7 @@
 #include "structures.h"
 #include <string.h>
 
-node* get_node(list_type);
+/*node* get_node(list_type);
 linked_list* get_linked_list(list_type);
 node* create_meta(char* meta);
 void test_meta_list();
@@ -27,7 +27,7 @@ void delete(linked_list *list,node* location);
 void insert(linked_list *list, node* new_node, node* location);
 node* seek_user(linked_list *list, char* user,int *ret_val);
 node* seek(linked_list *list, LTS lts , int *ret_val);
-
+*/
 int main(){
 
 	//test_meta_list();

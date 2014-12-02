@@ -1,8 +1,43 @@
+#include "sp.h"
+
+
+
 #include<stdio.h>
+#include<stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <sys/select.h>
+#include <netinet/in.h>
+#include <netdb.h>
+
+#include <errno.h>
+#include <time.h>
+
+#define PORT         10150
+
+
+#define MAX_MESS_LEN 1400
+#define SPREAD_PORT "10150"
+#define MAX_VSSETS      10
+#define MAX_MEMBERS     100
+
+
+
+
+#define BUF_SIZE 6500
+
+/*Spread USER*/
+//#define SPREAD_USER ""
+#define GROUP "rdeshpa33amehta26"
+
+#define SERVER_GRP "server_grp"
+
 //#include "linked_list.h"
 /*Different types of user requests user makes*/
 typedef enum request{
-	MSG, LIKE, UNLIKE, JOIN, LEAVE, HISTORY, VIEW
+	MSG, LIKE, UNLIKE, JOIN, LEAVE, HISTORY, VIEW,CONNECT
 }request;
 
 typedef enum list_type{
@@ -12,7 +47,7 @@ typedef enum list_type{
 
 /*Declarations of various types of nodes here*/
 typedef struct node{
-	
+
 	void* data;
 	struct node* next;
 }node;
@@ -73,7 +108,7 @@ typedef struct update{
 	char update_chat_room[80];
 	union union_update_data update_data;
 
-	
+
 }update;
 
 
@@ -95,8 +130,52 @@ typedef struct meta{
 
 
 
+/*My variables data structure client*/
+typedef struct my_variables_client{
+
+	int machine_id;
+	int my_ip;
+	sp_time timeout;
+	char private_group[80];
+}client_variables;
+
+/*My variables data structure server*/
+typedef struct my_variables_server{
+
+	int machine_id;
+	int my_ip;
+	sp_time timeout;
+	char private_group[80];
+}server_variables;
 
 
 
+char *public_server_grps[6]={"dummy","s1","s2","s3","s5","s6"};
+char *private_server_grps[6]={"dummy","server1","server2","server3","server5","server6"};
 
 
+
+node* get_node(list_type);
+linked_list* get_linked_list(list_type);
+node* create_meta(char* meta);
+void test_meta_list();
+void append(linked_list*, node*);
+node* create_line(char* user, char* message, int likes, int line_no, LTS lts);
+
+LTS create_LTS(int counter, int server_id);
+
+like_packet create_like_packet(int line_no, LTS lts, char* user);
+void print_meta(linked_list *meta_ll);
+
+void test_update_list();
+node* create_update( request update_type, LTS lts, char* chat_room, union_update_data data);
+
+void print_update(linked_list *update_ll);
+
+void print_line(linked_list *line_ll);
+
+void test_line_list();
+void delete(linked_list *list,node* location);
+void insert(linked_list *list, node* new_node, node* location);
+node* seek_user(linked_list *list, char* user,int *ret_val);
+node* seek(linked_list *list, LTS lts , int *ret_val);
