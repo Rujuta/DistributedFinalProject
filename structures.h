@@ -1,4 +1,4 @@
-#include "sp.h"
+#include "/home/cs437/exercises/ex3/include/sp.h"
 
 
 
@@ -22,6 +22,7 @@
 #define SPREAD_PORT "10150"
 #define MAX_VSSETS      10
 #define MAX_MEMBERS     100
+#define SIZE 80
 
 
 
@@ -41,7 +42,7 @@ typedef enum request{
 }request;
 
 typedef enum list_type{
-	LIST_UPDATE, LIST_LINE, LIST_META 
+	LIST_UPDATE, LIST_LINE, LIST_META ,LIST_CHATROOM
 }list_type;
 
 
@@ -67,7 +68,7 @@ typedef struct LTS{
 /*Update structure for like/unlike a line number*/
 typedef struct like_packet{
 
-	int like_packet_line_no;
+	//int like_packet_line_no;
 	struct LTS like_packet_line_no_lts;
 	char like_packet_user[80];
 }like_packet;
@@ -85,7 +86,7 @@ typedef struct line_packet{
 	char line_packet_user[80];
 	char line_packet_message[80];
 	int line_packet_likes;
-	int line_packet_line_no;
+	//int line_packet_line_no;
 	struct LTS line_packet_lts;
 }line_packet;
 
@@ -137,6 +138,11 @@ typedef struct my_variables_client{
 	int my_ip;
 	sp_time timeout;
 	char private_group[80];
+	char username[SIZE];
+	char my_chatroom[SIZE];
+	linked_list *msg_list;
+	//char my_server[SIZE];
+	int my_server;
 }client_variables;
 
 /*My variables data structure server*/
@@ -146,12 +152,25 @@ typedef struct my_variables_server{
 	int my_ip;
 	sp_time timeout;
 	char private_group[80];
+	linked_list *chat_lists;
+	LTS my_lts;
 }server_variables;
 
 
+typedef struct request_packet{
+	request request_packet_type;
+	LTS request_packet_lts;
+	char request_packet_data[SIZE];
+	char request_packet_user[SIZE];
+	char request_packet_chatroom[SIZE];
 
-char *public_server_grps[6]={"dummy","s1","s2","s3","s5","s6"};
-char *private_server_grps[6]={"dummy","server1","server2","server3","server5","server6"};
+}request_packet;
+
+typedef struct chatroom{
+	
+	char chatroom_name[SIZE];
+	linked_list *chatroom_msgs;
+}chatroom;
 
 
 
@@ -160,11 +179,11 @@ linked_list* get_linked_list(list_type);
 node* create_meta(char* meta);
 void test_meta_list();
 void append(linked_list*, node*);
-node* create_line(char* user, char* message, int likes, int line_no, LTS lts);
+node* create_line(char* user, char* message, int likes, LTS lts);
 
 LTS create_LTS(int counter, int server_id);
 
-like_packet create_like_packet(int line_no, LTS lts, char* user);
+like_packet create_like_packet(LTS lts, char* user);
 void print_meta(linked_list *meta_ll);
 
 void test_update_list();
@@ -179,3 +198,5 @@ void delete(linked_list *list,node* location);
 void insert(linked_list *list, node* new_node, node* location);
 node* seek_user(linked_list *list, char* user,int *ret_val);
 node* seek(linked_list *list, LTS lts , int *ret_val);
+
+void print_line(linked_list *line_ll);
