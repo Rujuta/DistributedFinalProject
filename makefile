@@ -9,13 +9,14 @@ DEPS=structures.h
 all: client server
 
 .c.o:
-	$(CC) $(CFLAGS) $(CPPFLAGS) -c $<
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c linked_list.c $<
 
-client: $(SP_LIBRARY_DIR)/libspread-core.a client.o
-	$(LD) -o $@ client.o $(SP_LIBRARY_DIR)/libspread-core.a -ldl -lm -lrt -lnsl $(SP_LIBRARY_DIR)/libspread-util.a 
+client: $(SP_LIBRARY_DIR)/libspread-core.a client.o ll_chat.o
+	$(LD) -o $@ client.o ll_chat.o $(SP_LIBRARY_DIR)/libspread-core.a -ldl -lm -lrt -lnsl $(SP_LIBRARY_DIR)/libspread-util.a
+	
 
-server:	$(SP_LIBRARY_DIR)/libspread-core.a server.o
-	$(LD) -o $@ server.o $(SP_LIBRARY_DIR)/libspread-core.a -ldl -lm -lrt -lnsl $(SP_LIBRARY_DIR)/libspread-util.a
+server:	$(SP_LIBRARY_DIR)/libspread-core.a server.o ll_chat.o
+	$(LD) -o $@ server.o ll_chat.o $(SP_LIBRARY_DIR)/libspread-core.a -ldl -lm -lrt -lnsl $(SP_LIBRARY_DIR)/libspread-util.a
 
 clean: 
 	rm -f *.o client

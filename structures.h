@@ -41,9 +41,17 @@ typedef enum request{
 	MSG, LIKE, UNLIKE, JOIN, LEAVE, HISTORY, VIEW,CONNECT
 }request;
 
+typedef enum response{
+	R_ACK, R_MSG, R_HISTORY, R_VIEW
+}response;
+
 typedef enum list_type{
 	LIST_UPDATE, LIST_LINE, LIST_META ,LIST_CHATROOM
 }list_type;
+
+typedef enum client_states{
+	NOT_CONNECTED, LOGGED_IN, IN_CHATROOM, LOG_CONN 
+}client_states;
 
 
 /*Declarations of various types of nodes here*/
@@ -70,7 +78,7 @@ typedef struct like_packet{
 
 	//int like_packet_line_no;
 	struct LTS like_packet_line_no_lts;
-	char like_packet_user[80];
+	char like_packet_user[20];
 }like_packet;
 
 /*Update structure for joining/leaving a packet*/
@@ -83,7 +91,7 @@ typedef struct join_packet{
  * to the clients*/
 typedef struct line_packet{
 
-	char line_packet_user[80];
+	char line_packet_user[20];
 	char line_packet_message[80];
 	int line_packet_likes;
 	//int line_packet_line_no;
@@ -125,7 +133,8 @@ typedef struct line{
 typedef struct meta{
 
 	//user ID of user who has liked a particular message
-	char meta_user[80];
+	char meta_user[20];
+	int cnt; //this will be zero when list indicates users who liked something
 
 }meta;
 
@@ -138,9 +147,10 @@ typedef struct my_variables_client{
 	int my_ip;
 	sp_time timeout;
 	char private_group[80];
-	char username[SIZE];
+	char username[20];
 	char my_chatroom[SIZE];
 	linked_list *msg_list;
+	linked_list *users_in_room;
 	//char my_server[SIZE];
 	int my_server;
 }client_variables;
@@ -166,10 +176,26 @@ typedef struct request_packet{
 
 }request_packet;
 
+typedef union response_data{
+
+	line_packet line;
+	int server_list[5];
+	char users[50][20];
+
+}response_data;
+
+
+typedef struct response_packet{
+	response response_packet_type;
+	response_data data;
+
+}response_packet;
+
 typedef struct chatroom{
 	
 	char chatroom_name[SIZE];
 	linked_list *chatroom_msgs;
+	linked_list *users;
 }chatroom;
 
 
@@ -199,4 +225,12 @@ void insert(linked_list *list, node* new_node, node* location);
 node* seek_user(linked_list *list, char* user,int *ret_val);
 node* seek(linked_list *list, LTS lts , int *ret_val);
 
+node* seek_chatroom(linked_list *list,char* name,int *ret_val);
+
 void print_line(linked_list *line_ll);
+
+
+node* create_line(char* user, char* message, int likes,LTS lts);
+
+node* create_chatroom(char*  name);
+

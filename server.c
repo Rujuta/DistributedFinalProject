@@ -1,6 +1,5 @@
 #include "sp.h"
 #include "structures.h"
-//#include<net_include.h>
 #define SPREAD_PORT "10150"
 #define debug 1
 
@@ -11,8 +10,13 @@
 #define MAXINT 2147483647
 
 
+char *public_server_grps[6]={"dummy","s1","s2","s3","s5","s6"};
+char *private_server_grps[6]={"dummy","server1","server2","server3","server5","server6"};
 
-void process_message(char* mess,char *);
+
+response_packet* create_response_packet(response type, server_variables* local_var);
+
+void process_message(char* mess,char* sender, server_variables *local_var);
 /*User connecting to spread*/
 static  char    User[80]; //machine ID of client connecting to spread
 
@@ -73,6 +77,17 @@ int main(int argc, char* argv[]){
 	local_var.machine_id=atoi(argv[1]);
 	local_var.timeout.sec=5;
 	local_var.timeout.usec=0;
+
+	//Set my local counter 
+	local_var.my_lts.LTS_counter=0;
+	local_var.my_lts.LTS_server_id=local_var.machine_id;
+
+	/*This will actually be a pointer to a list, each connecting to another list - each list standing
+	 * for one chat room*/
+	local_var.chat_lists=(linked_list*)get_linked_list(LIST_CHATROOM);
+
+	/*Here you will load old DATA of chatrooms into the chatlists structure*/
+	//TODO
 	connect_to_spread(&local_var);
 	/*Initialize Spread event handling system*/
 	E_init();
@@ -144,41 +159,24 @@ static  void    Bye()
 }
 
 
-void display_prompt(){
-
-}
-
-
-
-
-
-
-/*There will be a screen data structure, on
- * receiving updated data from server, this structure will 
- * be updated and user will see new set of messages*/
-void refresh_screen(){
-
-}
-
-/*When client gets disconnected from server, it displays a message
- * telling the user to connect to some other server*/
-void process_disconnected(){
-
-}
-
-/*Connect to specified server*/
-void connect_to_server(){
-
-}
-
-/*Get user's keyboard input*/
-void get_user_input(){
-
-}
-
 /*Send a packet to the server client is connected to*/
-void send_packet(){
+void send_packet(char *group_name, response_packet *packet, server_variables *local_var){
 
+
+	int ret;
+	ret= SP_multicast( Mbox, AGREED_MESS,group_name, 1, sizeof(response_packet), (char*)packet );
+	if(debug)
+		printf("%d",packet->response_packet_type);
+		fprintf(log1,"\nSending a response packet\n");
+
+
+	if( ret < 0 )
+	{
+		SP_error( ret );
+		Bye();
+	}
+
+	printf("\nLeaving send");
 }
 
 /*Create packet of a specified type
@@ -273,7 +271,7 @@ static  void    Read_message(int a, int b, void *local_var_arg)
 			fprintf(log1,"message from %s, of type %d,(%d bytes)\n",
 					sender, mess_type,  ret );
 		}
-		process_message(mess,sender);
+		process_message(mess,sender,local_var);
 
 
 	}
@@ -328,30 +326,206 @@ static  void    Read_message(int a, int b, void *local_var_arg)
 
 }
 
-void process_message(char* mess,char* sender){
+void process_message(char* mess,char* sender, server_variables *local_var){
 
 	int ret;
-	switch(mess[0]){
+	request_packet *recv_packet;//=malloc(sizeof(request_packet));
+	recv_packet=(request_packet*)mess;
+	node* temp, *prev, *user_check;
+	int ret_val=0;
+	/*Increment lts*/
+	//local_var->my_lts.LTS_counter++;
+	chatroom *croom, *my_data3;
+	switch(recv_packet->request_packet_type){
 
-		case 'c': ;
-			  char connect[MAX_MESS_LEN];
-			  sprintf(connect,"CONNECT");
-			  printf("\nGot a message of c\n");
-			  ret= SP_multicast( Mbox, AGREED_MESS,sender, 1, sizeof(connect), (char*)connect );
-			  if(debug)
-				  fprintf(log1,"\nSending a connect packet\n");
+		case MSG: printf("\nGot msg of type append\n");
+			  //Here need to find out the user is part of which chat room
+			  //Append to that chat room
+			  //From message, the chatroom data is obtained
+			  if(debug){
+			  	printf("\nGoing to seek chatroom %s\n",recv_packet->request_packet_chatroom);
+			  }
+			  print_chatlist(local_var->chat_lists);
+			  fflush(stdout);
+			  prev=seek_chatroom(local_var->chat_lists,recv_packet->request_packet_chatroom,&ret_val);
+			  printf("\n ret val --%d ",ret_val);
+			  fflush(stdout);
+
+			  if(ret_val==1){
+
+	                          local_var->my_lts.LTS_counter++;
+				  
+				  node* new_line=create_line(recv_packet->request_packet_user,recv_packet->request_packet_data,0, local_var->my_lts);
+				  if(prev==NULL){
+				  	croom=(chatroom*)local_var->chat_lists->head->data;
+				  }
+				  else{
+				  	croom	= (chatroom*)prev->next->data;
+				  } 
+				 linked_list* chat_list=croom->chatroom_msgs;
+				  append(chat_list,new_line);
+				  print_line(chat_list);
+				  //print_chatlist(local_var->chat_lists);
+				  /*Now send the same msg back to client so that it can refresh screen*/
+
+				  response_packet *line_p= create_response_packet(R_MSG,local_var);
+				  line* my_data2=(line*) new_line->data;
+				  memcpy(&(line_p->data),&(my_data2->line_content),sizeof(line_packet));
+
+				  send_packet(recv_packet->request_packet_chatroom,line_p,local_var);
 
 
-			  if( ret < 0 )
-			  {
-				  SP_error( ret );
-				  Bye();
+			  }
+			  else{
+				  printf("Chatroom doesn't exist, some error in code\n");
 			  }
 
 
 			  break;
+		case UNLIKE:
+			  break;
+		case JOIN: printf("\nGot a message of join");
+			   printf("\nRequest to join chat room: %s",recv_packet->request_packet_data);
+			   char group[SIZE];
+			   sscanf(recv_packet->request_packet_data,"%s",group);
+			   local_var->my_lts.LTS_counter++;
+			   
+
+			   /*First check if this chatroom exists in the list
+			    * i.e seek the list for the location of the chatroom
+			    * if null is returned then the chatroom doesn't exist
+			    * in that case do as below */
+
+			   prev= seek_chatroom(local_var->chat_lists,group,&ret_val);
+
+			   response_packet *response1=create_response_packet(R_ACK,local_var);
+			   if(ret_val==1){
+				   //chat room exists
+
+				   //send all the data in chat room so far
+				   if(prev==NULL){
+				   	temp=local_var->chat_lists->head;
+				   }
+				  else{
+				   temp=prev->next;
+				  }
+ 				
+
+
+				   my_data3=(chatroom*)temp->data;
+
+				   user_check=seek_user(my_data3->users,recv_packet->request_packet_user,&ret_val);
+				
+				   if(ret_val==1){
+				   	if(user_check==NULL){
+				   		//user exists and is the first user 
+						user_check=my_data3->users->head;
+
+									   	}
+					else{
+					
+						user_check=user_check->next;
+
+					}
+						//increment count of user
+					
+						
+						((meta*)user_check->data)->cnt++;
+				   
+
+				   }
+				   else{
+				   
+					node* user_node=create_meta(recv_packet->request_packet_user);
+				   	append(my_data3->users,user_node);
+				   }
+
+
+
+				   /*Create a list of users and send*/
+				   node* current_user=my_data3->users->head;
+				   int i=0;
+				   while(current_user!=NULL){
+				   
+					   meta* user_m=(meta*)current_user->data;
+					   //char* user_name=user_m->meta_user;
+					   sprintf(response1->data.users[i],"%s",user_m->meta_user);
+					   current_user=current_user->next;
+					   i++;
+				   	
+				   }
+				   sprintf(response1->data.users[i],"%s","\0");
+				   
+				   
+				   /*Send this list to sender*/
+				   	   
+			   	   send_packet(sender,response1,local_var);
+				   
+
+				   //send_packet(group,response1, local_var);
+				   //
+				   //send previous msgs of chat grp to user
+				    linked_list* msgs=my_data3->chatroom_msgs;
+				   temp= msgs->head;
+
+
+				   while(temp!=NULL){
+					   
+					   response_packet *line_p= create_response_packet(R_MSG,local_var);
+					   line* my_data4=(line*)temp->data;
+					   //line_packet to_send;
+					   memcpy(&(line_p->data),&(my_data4->line_content),sizeof(line_packet));
+
+					   send_packet(sender,line_p,local_var);
+					   temp= temp->next;
+				   }
+			   }
+			   else{
+				   node* new_chatroom=(node*)create_chatroom(group);
+				   append(local_var->chat_lists,new_chatroom);
+
+
+				    node* user_node=create_meta(recv_packet->request_packet_user);
+				    chatroom* newly_created_room=(chatroom*)new_chatroom->data;
+				    append(newly_created_room->users,user_node);
+
+				   meta* u=(meta*)newly_created_room->users->head->data;
+				   sprintf(response1->data.users[0],"%s",u->meta_user);
+				    
+				   printf("\n%s",u->meta_user);
+				   printf("\n%s",response1->data.users[0]);
+				   
+				   sprintf(response1->data.users[1],"%s","\0");
+				   send_packet(sender,response1,local_var);
+				   print_meta(newly_created_room->users);
+				   //print_chatlist(local_var->chat_lists);
+				   /*Join the chat group first on spread*/
+				   ret = SP_join( Mbox, group);
+				   if( ret < 0 ) {
+					   SP_error( ret );
+					   Bye();
+				   }
+
+			   }
+
+			   break;
+		case HISTORY:
+			   break;
+		case VIEW:
+			   break;
+		case LIKE:
+			   break;
+
 
 	}
-
 }
+
+/*This function creates a packet of the type specified with the data specified and then calls the send function on it*/
+response_packet* create_response_packet(response type, server_variables* local_var){
+
+	response_packet *new_packet=(response_packet*)malloc(sizeof(response_packet));
+	new_packet->response_packet_type=type;
+	return new_packet;
+}
+
 
