@@ -23,7 +23,7 @@
 #define MAX_VSSETS      10
 #define MAX_MEMBERS     100
 #define SIZE 80
-
+#define LINES_ON_SCREEN 3
 
 
 
@@ -138,6 +138,15 @@ typedef struct meta{
 
 }meta;
 
+typedef struct chatroom{
+
+	char chatroom_name[SIZE];
+	linked_list *chatroom_msgs;
+	linked_list *users;
+	int counter;
+	node* start;
+}chatroom;
+
 
 
 /*My variables data structure client*/
@@ -148,9 +157,9 @@ typedef struct my_variables_client{
 	sp_time timeout;
 	char private_group[80];
 	char username[20];
-	char my_chatroom[SIZE];
-	linked_list *msg_list;
-	linked_list *users_in_room;
+	//char my_chatroom[SIZE];
+	chatroom *my_chatroom;
+	//linked_list *users_in_room;
 	//char my_server[SIZE];
 	int my_server;
 }client_variables;
@@ -190,14 +199,6 @@ typedef struct response_packet{
 	response_data data;
 
 }response_packet;
-
-typedef struct chatroom{
-	
-	char chatroom_name[SIZE];
-	linked_list *chatroom_msgs;
-	linked_list *users;
-}chatroom;
-
 
 
 node* get_node(list_type);

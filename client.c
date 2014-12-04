@@ -81,10 +81,13 @@ int main(int argc, char* argv[]){
 	local_var.timeout.sec=5;
 	local_var.timeout.usec=0;
 	/*Initialize an empty linkedlist for msgs*/
-	local_var.msg_list=get_linked_list(LIST_LINE);
+	//local_var.msg_list=get_linked_list(LIST_LINE);
+	
+	local_var.my_chatroom = (chatroom*) malloc(sizeof(chatroom));
 
 	/*Initialize my chatroom to be the empty string*/
-	sprintf(local_var.my_chatroom,"%s","\0");
+	local_var.my_chatroom->chatroom_msgs=get_linked_list(LIST_LINE);
+	sprintf(local_var.my_chatroom->chatroom_name,"%s","\0");
 
 	/*Connect to spread*/
 	connect_to_spread(&local_var);
@@ -154,7 +157,7 @@ request_packet* create_packet(request type,char* data, LTS lts, client_variables
 	new_packet->request_packet_lts.LTS_server_id=lts.LTS_server_id;
 	sprintf(new_packet->request_packet_data,"%s",data);
 	sprintf(new_packet->request_packet_user,"%s",local_var->username);
-	sprintf(new_packet->request_packet_chatroom,"%s",local_var->my_chatroom);	
+	sprintf(new_packet->request_packet_chatroom,"%s",local_var->my_chatroom->chatroom_name);	
 	/*Once packet is created, just send the packet to the server*/
 	send_packet(new_packet,local_var);
 
@@ -203,7 +206,7 @@ void process_input(char* input, client_variables *local_var){
 
 
 			 break;
-		case 'j': sscanf(&input[2],"%s",local_var->my_chatroom);
+		case 'j': sscanf(&input[2],"%s",local_var->my_chatroom->chatroom_name);
 			  //sprintf(local_var->my_chatroom,"%s",&input[2]);
 			  create_packet(JOIN,&input[2],my_lts,local_var);
 
@@ -228,12 +231,20 @@ void refresh_screen(client_variables *local_var){
 		printf("\nRefreshing screen!\n");
 	
 	}
-	node* temp=local_var->msg_list->head;
+	node *temp;
+
+	if(local_var->my_chatroom->start == NULL){
+		temp=local_var->my_chatroom->chatroom_msgs->head;
+
+	}else{
+		temp = local_var->my_chatroom->start;
+	}
+
 	int line_no=1;
 	clear();
-	printf("\n Room : %s",local_var->my_chatroom);
+	printf("\n Room : %s",local_var->my_chatroom->chatroom_name);
 	printf("\nAttendees: ");
-	node* u=local_var->users_in_room->head;
+	node* u=local_var->my_chatroom->users->head;
 	while(u!=NULL){
 	
 		meta* v= (meta*) u->data;
@@ -241,14 +252,14 @@ void refresh_screen(client_variables *local_var){
 		u=u->next;
 	
 	}
-	//also need to print the users in the room.
+	
 	
 	while(temp!=NULL){
 
 		line* my_data2=(line*)temp->data;
 		
 
-		printf("\n %d %s ",line_no,my_data2->line_content.line_packet_user);
+		printf("\n %d. %s: ",line_no,my_data2->line_content.line_packet_user);
 		printf("%s ",  my_data2->line_content.line_packet_message);
 		if(my_data2->line_content.line_packet_likes>0)
 			printf("\tLikes : %d",  my_data2->line_content.line_packet_likes);
@@ -478,20 +489,20 @@ void process_message(char* mess,client_variables *local_var){
 	
 		case R_ACK: // here is an ack to join a group, do an sp_join on receive
 			printf("\nGot ACK");
-			ret = SP_join( Mbox, local_var->my_chatroom);
+			ret = SP_join( Mbox, local_var->my_chatroom->chatroom_name);
 			if( ret < 0 ) SP_error( ret );
 			if(debug){
 				fprintf(log1,"\nJoined  group");
 				fflush(log1);
 			}
 			/*Put users in chat group in list of users in chat group in local var*/
-			local_var->users_in_room=get_linked_list(LIST_META);
+			local_var->my_chatroom->users=get_linked_list(LIST_META);
 			int i =0;
 			
 			while(strcmp(new_response->data.users[i],"\0")!=0){
 			
 				node *new_user=create_meta(new_response->data.users[i]);
-				append(local_var->users_in_room,new_user);
+				append(local_var->my_chatroom->users,new_user);
 				i++;
 
 			}
@@ -504,14 +515,22 @@ void process_message(char* mess,client_variables *local_var){
 			;
 			node * n1 = create_line(new_response->data.line.line_packet_user,new_response->data.line.line_packet_message,new_response->data.line.line_packet_likes,new_response->data.line.line_packet_lts);
 			int ret_val;
-			node *prev = seek(local_var->msg_list, new_response->data.line.line_packet_lts, &ret_val);
+			node *prev = seek(local_var->my_chatroom->chatroom_msgs, new_response->data.line.line_packet_lts, &ret_val);
 
 			if(ret_val ==1){
 
-				delete(local_var->msg_list, prev);
-				insert(local_var->msg_list, n1, prev);
+				delete(local_var->my_chatroom->chatroom_msgs, prev);
+				insert(local_var->my_chatroom->chatroom_msgs, n1, prev);
 			}else{
-				append(local_var->msg_list,n1);
+				append(local_var->my_chatroom->chatroom_msgs,n1);
+				local_var->my_chatroom->counter++;
+				if(local_var->my_chatroom->counter ==LINES_ON_SCREEN){
+					local_var->my_chatroom->start=local_var->my_chatroom->chatroom_msgs->head;
+					
+				}else if(local_var->my_chatroom->counter>LINES_ON_SCREEN){
+					local_var->my_chatroom->start=local_var->my_chatroom->start->next;
+				
+				}
 			}
 			//print_line(local_var->msg_list);
 			refresh_screen(local_var);

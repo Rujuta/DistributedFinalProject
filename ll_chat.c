@@ -132,6 +132,8 @@ node* create_chatroom(char*  name){
 	sprintf(my_data->chatroom_name,name);
 	my_data->chatroom_msgs=get_linked_list(LIST_LINE);
 	my_data->users=get_linked_list(LIST_META);
+	my_data->counter=0;
+	my_data->start= NULL;
 
 	return new_node;
 }
