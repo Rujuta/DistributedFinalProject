@@ -503,7 +503,16 @@ void process_message(char* mess,client_variables *local_var){
 			//printf("\ngot meessage : %s",new_response->data.line.line_packet_message);
 			;
 			node * n1 = create_line(new_response->data.line.line_packet_user,new_response->data.line.line_packet_message,new_response->data.line.line_packet_likes,new_response->data.line.line_packet_lts);
-			append(local_var->msg_list,n1);
+			int ret_val;
+			node *prev = seek(local_var->msg_list, new_response->data.line.line_packet_lts, &ret_val);
+
+			if(ret_val ==1){
+
+				delete(local_var->msg_list, prev);
+				insert(local_var->msg_list, n1, prev);
+			}else{
+				append(local_var->msg_list,n1);
+			}
 			//print_line(local_var->msg_list);
 			refresh_screen(local_var);
 
