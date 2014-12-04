@@ -38,19 +38,19 @@
 //#include "linked_list.h"
 /*Different types of user requests user makes*/
 typedef enum request{
-	MSG, LIKE, UNLIKE, JOIN, LEAVE, HISTORY, VIEW,CONNECT
+	MSG, LIKE, UNLIKE, JOIN, LEAVE, HISTORY, VIEW,CONNECT, DISCONNECT
 }request;
 
 typedef enum response{
-	R_ACK, R_MSG, R_HISTORY, R_VIEW
+	R_ACK=10, R_MSG, R_HISTORY, R_VIEW
 }response;
 
 typedef enum list_type{
-	LIST_UPDATE, LIST_LINE, LIST_META ,LIST_CHATROOM
+	LIST_UPDATE=20, LIST_LINE, LIST_META ,LIST_CHATROOM
 }list_type;
 
 typedef enum client_states{
-	NOT_CONNECTED, LOGGED_IN, IN_CHATROOM, LOG_CONN 
+	NOT_CONNECTED=30, LOGGED_IN, IN_CHATROOM, LOG_CONN,CONNECTED 
 }client_states;
 
 
@@ -162,6 +162,7 @@ typedef struct my_variables_client{
 	//linked_list *users_in_room;
 	//char my_server[SIZE];
 	int my_server;
+	client_states my_state;
 }client_variables;
 
 /*My variables data structure server*/

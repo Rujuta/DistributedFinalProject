@@ -414,9 +414,9 @@ void print_line(linked_list *line_ll){
 
 		printf("\nPrinting line node's data\n");
 
-		printf("LTS %d, %d Line no: %d ",my_data2->line_content.line_packet_lts.LTS_counter, my_data2->line_content.line_packet_lts.LTS_server_id);
+		printf("LTS %d, %d  ",my_data2->line_content.line_packet_lts.LTS_counter, my_data2->line_content.line_packet_lts.LTS_server_id);
 		printf("Message: %s",my_data2->line_content.line_packet_message);
-		printf("Likes: %d",my_data2->line_content.line_packet_likes);
+		printf("Likes: %d\n",my_data2->line_content.line_packet_likes);
 		//printf("People who liked this:");
 		//print_meta(my_data2->line_meta);
 		temp=temp->next;

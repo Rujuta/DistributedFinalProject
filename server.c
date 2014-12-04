@@ -14,6 +14,7 @@ char *public_server_grps[6]={"dummy","s1","s2","s3","s5","s6"};
 char *private_server_grps[6]={"dummy","server1","server2","server3","server5","server6"};
 
 
+void process_client_update(request type, server_variables *local_var, request_packet* recv_packet);
 response_packet* create_response_packet(response type, server_variables* local_var);
 
 void process_message(char* mess,char* sender, server_variables *local_var);
@@ -166,8 +167,8 @@ void send_packet(char *group_name, response_packet *packet, server_variables *lo
 	int ret;
 	ret= SP_multicast( Mbox, AGREED_MESS,group_name, 1, sizeof(response_packet), (char*)packet );
 	if(debug)
-		printf("%d",packet->response_packet_type);
-		fprintf(log1,"\nSending a response packet\n");
+		printf("Packet type is %d\n",packet->response_packet_type);
+	fprintf(log1,"\nSending a response packet\n");
 
 
 	if( ret < 0 )
@@ -176,7 +177,7 @@ void send_packet(char *group_name, response_packet *packet, server_variables *lo
 		Bye();
 	}
 
-	printf("\nLeaving send");
+	printf("\nLeaving send\n");
 }
 
 /*Create packet of a specified type
@@ -188,7 +189,7 @@ void create_packet(){
 static  void    Assign(char *argv[])
 {
 	if(debug){
-		printf("in assign");
+		//printf("\nin assign");
 	}
 	sprintf(User,'\0');
 	strcat(User,"s");
@@ -236,7 +237,7 @@ static  void    Read_message(int a, int b, void *local_var_arg)
 	if( ret < 0 )
 	{
 
-		printf("Return Value :%d");
+		printf("\nReturn Value :%d");
 
 		if(debug){
 			fprintf(log1,"\nIn error 1");
@@ -267,7 +268,7 @@ static  void    Read_message(int a, int b, void *local_var_arg)
 	{
 		mess[ret] = 0;
 		if(debug){
-			printf("message from %s, of type %d,(%d bytes)\n",sender,mess_type,ret);
+			printf("\nmessage from %s, of type %d,(%d bytes)\n",sender,mess_type,ret);
 			fprintf(log1,"message from %s, of type %d,(%d bytes)\n",
 					sender, mess_type,  ret );
 		}
@@ -290,7 +291,7 @@ static  void    Read_message(int a, int b, void *local_var_arg)
 					sender, num_groups, mess_type );
 			if( Is_caused_join_mess( service_type ) )
 			{
-				printf("Due to join of  %s\n",  memb_info.changed_member);
+				printf("\nDue to join of  %s\n",  memb_info.changed_member);
 				fprintf(log1,"Due to the JOIN of %s\n", memb_info.changed_member );
 			}else if( Is_caused_leave_mess( service_type ) ){
 				printf("Due to the LEAVE of %s\n", memb_info.changed_member );
@@ -343,7 +344,7 @@ void process_message(char* mess,char* sender, server_variables *local_var){
 			  //Append to that chat room
 			  //From message, the chatroom data is obtained
 			  if(debug){
-			  	printf("\nGoing to seek chatroom %s\n",recv_packet->request_packet_chatroom);
+				  printf("\nGoing to seek chatroom %s\n",recv_packet->request_packet_chatroom);
 			  }
 			  print_chatlist(local_var->chat_lists);
 			  fflush(stdout);
@@ -353,16 +354,16 @@ void process_message(char* mess,char* sender, server_variables *local_var){
 
 			  if(ret_val==1){
 
-	                          local_var->my_lts.LTS_counter++;
-				  
+				  local_var->my_lts.LTS_counter++;
+
 				  node* new_line=create_line(recv_packet->request_packet_user,recv_packet->request_packet_data,0, local_var->my_lts);
 				  if(prev==NULL){
-				  	croom=(chatroom*)local_var->chat_lists->head->data;
+					  croom=(chatroom*)local_var->chat_lists->head->data;
 				  }
 				  else{
-				  	croom	= (chatroom*)prev->next->data;
+					  croom	= (chatroom*)prev->next->data;
 				  } 
-				 linked_list* chat_list=croom->chatroom_msgs;
+				  linked_list* chat_list=croom->chatroom_msgs;
 				  append(chat_list,new_line);
 				  print_line(chat_list);
 				  //print_chatlist(local_var->chat_lists);
@@ -377,7 +378,7 @@ void process_message(char* mess,char* sender, server_variables *local_var){
 
 			  }
 			  else{
-				  printf("Chatroom doesn't exist, some error in code\n");
+				  printf("\nChatroom doesn't exist, some error in code\n");
 			  }
 
 
@@ -389,7 +390,7 @@ void process_message(char* mess,char* sender, server_variables *local_var){
 			   char group[SIZE];
 			   sscanf(recv_packet->request_packet_data,"%s",group);
 			   local_var->my_lts.LTS_counter++;
-			   
+
 
 			   /*First check if this chatroom exists in the list
 			    * i.e seek the list for the location of the chatroom
@@ -404,40 +405,40 @@ void process_message(char* mess,char* sender, server_variables *local_var){
 
 				   //send all the data in chat room so far
 				   if(prev==NULL){
-				   	temp=local_var->chat_lists->head;
+					   temp=local_var->chat_lists->head;
 				   }
-				  else{
-				   temp=prev->next;
-				  }
- 				
+				   else{
+					   temp=prev->next;
+				   }
+
 
 
 				   my_data3=(chatroom*)temp->data;
 
 				   user_check=seek_user(my_data3->users,recv_packet->request_packet_user,&ret_val);
-				
+
 				   if(ret_val==1){
-				   	if(user_check==NULL){
-				   		//user exists and is the first user 
-						user_check=my_data3->users->head;
+					   if(user_check==NULL){
+						   //user exists and is the first user 
+						   user_check=my_data3->users->head;
 
-									   	}
-					else{
-					
-						user_check=user_check->next;
+					   }
+					   else{
 
-					}
-						//increment count of user
-					
-						
-						((meta*)user_check->data)->cnt++;
-				   
+						   user_check=user_check->next;
+
+					   }
+					   //increment count of user
+
+
+					   ((meta*)user_check->data)->cnt++;
+
 
 				   }
 				   else{
-				   
-					node* user_node=create_meta(recv_packet->request_packet_user);
-				   	append(my_data3->users,user_node);
+
+					   node* user_node=create_meta(recv_packet->request_packet_user);
+					   append(my_data3->users,user_node);
 				   }
 
 
@@ -446,31 +447,31 @@ void process_message(char* mess,char* sender, server_variables *local_var){
 				   node* current_user=my_data3->users->head;
 				   int i=0;
 				   while(current_user!=NULL){
-				   
+
 					   meta* user_m=(meta*)current_user->data;
 					   //char* user_name=user_m->meta_user;
 					   sprintf(response1->data.users[i],"%s",user_m->meta_user);
 					   current_user=current_user->next;
 					   i++;
-				   	
+
 				   }
 				   sprintf(response1->data.users[i],"%s","\0");
-				   
-				   
+
+
 				   /*Send this list to sender*/
-				   	   
-			   	   send_packet(sender,response1,local_var);
-				   
+
+				   send_packet(sender,response1,local_var);
+
 
 				   //send_packet(group,response1, local_var);
 				   //
 				   //send previous msgs of chat grp to user
-				    linked_list* msgs=my_data3->chatroom_msgs;
+				   linked_list* msgs=my_data3->chatroom_msgs;
 				   temp= msgs->head;
 
 
 				   while(temp!=NULL){
-					   
+
 					   response_packet *line_p= create_response_packet(R_MSG,local_var);
 					   line* my_data4=(line*)temp->data;
 					   //line_packet to_send;
@@ -485,16 +486,16 @@ void process_message(char* mess,char* sender, server_variables *local_var){
 				   append(local_var->chat_lists,new_chatroom);
 
 
-				    node* user_node=create_meta(recv_packet->request_packet_user);
-				    chatroom* newly_created_room=(chatroom*)new_chatroom->data;
-				    append(newly_created_room->users,user_node);
+				   node* user_node=create_meta(recv_packet->request_packet_user);
+				   chatroom* newly_created_room=(chatroom*)new_chatroom->data;
+				   append(newly_created_room->users,user_node);
 
 				   meta* u=(meta*)newly_created_room->users->head->data;
 				   sprintf(response1->data.users[0],"%s",u->meta_user);
-				    
-				   printf("\n%s",u->meta_user);
-				   printf("\n%s",response1->data.users[0]);
-				   
+
+				   printf("\nUser is :: %s",u->meta_user);
+				   printf("\nUser just joined is%s",response1->data.users[0]);
+
 				   sprintf(response1->data.users[1],"%s","\0");
 				   send_packet(sender,response1,local_var);
 				   print_meta(newly_created_room->users);
@@ -514,10 +515,111 @@ void process_message(char* mess,char* sender, server_variables *local_var){
 		case VIEW:
 			   break;
 		case LIKE:
+			   if(debug){
+			   	printf("\nGot message::: %d type",recv_packet->request_packet_type);
+			   }
+			   process_client_update(recv_packet->request_packet_type,local_var,recv_packet);
 			   break;
 
 
 	}
+}
+
+
+void process_client_update(request type, server_variables *local_var, request_packet* recv_packet){
+
+	switch(type){
+
+
+		case LIKE:
+			;
+			if(debug){
+				printf("\nGot LIKE\n");
+			}
+			char group[SIZE];
+			sscanf(recv_packet->request_packet_chatroom,"%s",group);
+			//local_var->my_lts.LTS_counter++;
+			LTS to_find;
+
+			//got the LTS to seek
+			to_find=recv_packet->request_packet_lts;
+
+			//get chatroom from msg
+
+
+
+			//get LTS of msg that has been liked
+			//
+
+			//seek for the LTS in the chatroom that I have 
+			int ret_val;
+			if(debug){
+				printf("\nChat room to seek: %s",group);
+				fflush(stdout);
+			}
+			node* seeked_room=seek_chatroom(local_var->chat_lists,group,&ret_val);
+			if(ret_val==1){
+
+				if(debug){
+					printf("\nGot room");
+				}
+				if(seeked_room==NULL){ 
+					seeked_room=local_var->chat_lists->head;
+				}
+				else{
+					seeked_room=seeked_room->next;
+				}
+
+				chatroom* got_room=(chatroom*)seeked_room->data;
+				int ret_val2;
+				node* to_modify=seek(got_room->chatroom_msgs,to_find,&ret_val2);
+				if(ret_val2==1){
+
+					if(debug){
+						printf("\nGot line");
+					}
+					if(to_modify==NULL){
+						to_modify=got_room->chatroom_msgs->head;
+					}
+					else{
+						to_modify=to_modify->next;
+					}
+
+					line* selected_line=(line*)to_modify->data;
+
+					//seek for user to see if user has liked
+					int ret_val3;
+					node* user1=seek_user(selected_line->line_meta, recv_packet->request_packet_user,&ret_val3);
+					if(ret_val3!=1){
+						if(debug){
+							printf("\nGot user");
+						}
+						node* new_user= create_meta(recv_packet->request_packet_user);
+						append(selected_line->line_meta,new_user);
+						selected_line->line_content.line_packet_likes++;
+
+						response_packet *line_p= create_response_packet(R_MSG,local_var);
+						memcpy(&(line_p->data),&(selected_line->line_content),sizeof(line_packet));
+
+						send_packet(recv_packet->request_packet_chatroom,line_p,local_var);
+					}
+				}
+
+			}
+
+
+			//Once LTS is found
+			//check if the same user has liked it or not in the list of users
+
+			//if liked, already, do nothing 
+			//otherwise increment no of likes, add user to liked list
+
+
+			break;
+
+
+	}
+
 }
 
 /*This function creates a packet of the type specified with the data specified and then calls the send function on it*/
