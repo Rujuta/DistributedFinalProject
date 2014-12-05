@@ -186,19 +186,23 @@ void send_packet(char *group_name, response_packet *packet, server_variables *lo
 
 	int ret;
 	/*If flag is 0 change group name to include server's ID */
+
+	char chatroom1[SIZE]="\0";
 	if(flag==0){
 
-		char chatroom1[SIZE]="\0";
 		strcat(chatroom1,group_name);
 		
 
 		strcat(chatroom1,public_server_grps[local_var->machine_id]);
 
 	}
-	ret= SP_multicast( Mbox, AGREED_MESS,group_name, 1, sizeof(response_packet), (char*)packet );
+	else{
+		 strcat(chatroom1,group_name);
+	}
+	ret= SP_multicast( Mbox, AGREED_MESS,chatroom1, 1, sizeof(response_packet), (char*)packet );
 	if(debug) {
 		printf("\n\nPacket type is %d\n",packet->response_packet_type);
-		printf("\n\nSending a response packet to %s\n\n",group_name);
+		printf("\n\nSending a response packet to %s\n\n",chatroom1);
 	}
 
 	if( ret < 0 )
