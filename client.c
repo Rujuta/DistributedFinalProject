@@ -172,7 +172,8 @@ request_packet* create_packet(request type,char* data, LTS lts, client_variables
 
 	request_packet *new_packet=(request_packet*)malloc(sizeof(request_packet));
 	if(debug){
-		printf("\nType is %d",type);
+		printf("\nType is %d chatroom %s",type,local_var->my_chatroom->chatroom_name);
+
 		fflush(stdout);
 	}
 	new_packet->request_packet_type=type;
@@ -180,6 +181,7 @@ request_packet* create_packet(request type,char* data, LTS lts, client_variables
 	new_packet->request_packet_lts.LTS_server_id=lts.LTS_server_id;
 	sprintf(new_packet->request_packet_data,"%s",data);
 	sprintf(new_packet->request_packet_user,"%s",local_var->username);
+
 	sprintf(new_packet->request_packet_chatroom,"%s",local_var->my_chatroom->chatroom_name);	
 	/*Once packet is created, just send the packet to the server*/
 	send_packet(new_packet,local_var);
@@ -247,6 +249,7 @@ void process_input(char* input, client_variables *local_var){
 		case 'a': 
 			if(local_var->my_state == IN_CHATROOM){
 				create_packet(MSG,&input[2],my_lts,local_var);
+
 			}
 			else{
 				printf("\nYou need to be in a chatroom to print a msg\n");
