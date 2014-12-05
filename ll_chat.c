@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#define debug 0
 //#include "net_include.h"
 
 /*Allocate memory for a node in the list*/
@@ -43,7 +44,11 @@ linked_list* get_linked_list(list_type type){
 /*Appends a node to the end of a linkedlist*/
 void append(linked_list *list, node* new_node){
 
+	if(debug){
 	printf("\nEntered Append\n");
+	
+	fflush(stdout);
+	}
 	if(is_empty(list)){
 		list->head=new_node;
 
@@ -56,13 +61,19 @@ void append(linked_list *list, node* new_node){
 	}
 	list->tail=new_node;
 
+	if(debug){
 	printf("\nLeaving append\n");
-}
+		fflush(stdout);
+	}
+	}
 
 /*Checks if a list is empty*/
 int is_empty(linked_list *list){
 
+	if(debug){
 	printf("\nIn is empty\n");
+	fflush(stdout);
+	}
 	if (list->head==NULL)
 		return 1;
 	else
@@ -73,7 +84,11 @@ int is_empty(linked_list *list){
 /*Create a node of type meta*/
 node* create_meta(char* user_name){
 
+	if(debug){
 	printf("\n entered create_meta");
+	
+	fflush(stdout);
+	}
 	node *new_node=get_node(LIST_META);	
 	meta* my_meta;
 	my_meta=(meta*)new_node->data;
@@ -140,8 +155,10 @@ node* create_chatroom(char*  name){
 
 node* seek_chatroom(linked_list *list,char* name,int *ret_val){
 
-	printf("Entering Seek chatroom");
-	printf("Entering Seek chatroom");
+	if(debug){
+		printf("Entering Seek chatroom");
+		fflush(stdout);
+	}
 	node* prev=NULL;
 	node* temp= list->head;
 	*ret_val =0;
@@ -171,9 +188,11 @@ node* seek_chatroom(linked_list *list,char* name,int *ret_val){
 node* seek(linked_list *list, LTS lts , int *ret_val){
 
 	//we set ret_val =1 when value is found else its 0
-	printf("\n In seek\n");
-	printf("\nLTS server id :%d",lts.LTS_server_id);
-	printf("\nLTS counter id :%d",lts.LTS_counter);
+	if(debug){
+		printf("\n In seek\n");
+		printf("\nLTS server id :%d",lts.LTS_server_id);
+		printf("\nLTS counter id :%d",lts.LTS_counter);
+	}
 	node* prev=list->head;
 	node* temp=prev;
 	*ret_val=0;
@@ -186,9 +205,11 @@ node* seek(linked_list *list, LTS lts , int *ret_val){
 				;
 				line* my_data;
 				my_data=(line*)temp->data;
-				printf("\nline LTS counter id :%d",my_data->line_content.line_packet_lts.LTS_counter);
-				printf("\nline LTS server id :%d",my_data->line_content.line_packet_lts.LTS_server_id);
 
+				if(debug){
+					printf("\nline LTS counter id :%d",my_data->line_content.line_packet_lts.LTS_counter);
+					printf("\nline LTS server id :%d",my_data->line_content.line_packet_lts.LTS_server_id);
+				}
 				if(my_data->line_content.line_packet_lts.LTS_counter>lts.LTS_counter){
 
 					//check if this is the first node
@@ -201,10 +222,13 @@ node* seek(linked_list *list, LTS lts , int *ret_val){
 				}
 				else if(my_data->line_content.line_packet_lts.LTS_counter == lts.LTS_counter){
 
-					printf("\nLine's server id %d",my_data->line_content.line_packet_lts.LTS_server_id);
+					if(debug){
+						printf("\nLine's server id %d",my_data->line_content.line_packet_lts.LTS_server_id);
+					}
 					if(my_data->line_content.line_packet_lts.LTS_server_id > lts.LTS_server_id){
-
-						printf("\n Server id greater\n");
+						if(debug){
+							printf("\n Server id greater\n");
+						}
 						if(temp==list->head){
 							return NULL;
 						}
@@ -217,9 +241,9 @@ node* seek(linked_list *list, LTS lts , int *ret_val){
 
 							*ret_val=1;
 
-
-							printf("\n Server id equal\n");
-
+							if(debug){
+								printf("\n Server id equal\n");
+							}
 							if(temp==list->head){
 								return NULL;
 							}
@@ -228,8 +252,9 @@ node* seek(linked_list *list, LTS lts , int *ret_val){
 							}
 						}else{
 
-							printf("\n Server id less\n");
-
+							if(debug){
+								printf("\n Server id less\n");
+							}
 							//return temp;
 						}
 					}
@@ -242,9 +267,10 @@ node* seek(linked_list *list, LTS lts , int *ret_val){
 				update* my_data2;
 
 				my_data2=(update*)temp->data;
-				printf("\nupdate LTS counter id :%d",my_data2->update_lts.LTS_counter);
-				printf("\nupdate LTS server id :%d",my_data2->update_lts.LTS_server_id);
-
+				if(debug){
+					printf("\nupdate LTS counter id :%d",my_data2->update_lts.LTS_counter);
+					printf("\nupdate LTS server id :%d",my_data2->update_lts.LTS_server_id);
+				}
 
 				if(my_data2->update_lts.LTS_counter>lts.LTS_counter){
 
@@ -260,7 +286,9 @@ node* seek(linked_list *list, LTS lts , int *ret_val){
 
 					if(my_data2->update_lts.LTS_server_id > lts.LTS_server_id){
 
-						printf("\n Server id greater\n");
+						if(debug){
+							printf("\n Server id greater\n");
+						}
 						if(temp==list->head){
 							return NULL;
 						}
@@ -273,9 +301,9 @@ node* seek(linked_list *list, LTS lts , int *ret_val){
 
 							*ret_val=1;
 
-
-							printf("\n Server id equal\n");
-
+							if(debug){
+								printf("\n Server id equal\n");
+							}
 							if(temp==list->head){
 								return NULL;
 							}
@@ -284,9 +312,9 @@ node* seek(linked_list *list, LTS lts , int *ret_val){
 							}
 
 						}else{
-
-							printf("\n server id less\n");
-
+							if(debug){
+								printf("\n server id less\n");
+							}
 							//return temp;
 						}								
 					}
@@ -299,15 +327,19 @@ node* seek(linked_list *list, LTS lts , int *ret_val){
 		temp=temp->next;
 
 	}
-	printf("\n returning tail");
+	if(debug){
+		printf("\n returning tail");
+	}
 	return list->tail;
 
 }
 
 node* seek_user(linked_list *list, char* user,int *ret_val){
 
-
-	printf("Entering Seek");
+	if(debug){
+		printf("Entering Seek");
+		fflush(stdout);
+	}
 	node* prev=NULL;
 	node* temp= list->head;
 	*ret_val =0;
@@ -357,7 +389,10 @@ void insert(linked_list *list, node* new_node, node* location){
 /*Delete from a list on being passed the location after which is to be deleted*/
 void delete(linked_list *list,node* location){
 
-	printf("\n In delete\n");
+	if(debug){
+		printf("\n In delete\n");
+		fflush(stdout);
+	}
 	if(location==NULL){ //delete head node
 
 		list->head=list->head->next;
@@ -405,18 +440,27 @@ like_packet create_like_packet(LTS lts, char* user){
 
 void print_line(linked_list *line_ll){
 
-	printf("\n In Line  list\n");
+	if(debug){
+		printf("\n In Line  list\n");
+		fflush(stdout);
+	}
 	node *temp=line_ll->head;
-	printf("\nYour list is:\n");
+	if(debug){
+		printf("\nYour list is:\n");
+		fflush(stdout);
+	}
 	while(temp!=NULL){
 
 		line* my_data2=(line*)temp->data;
+		if(debug){
+			printf("\nPrinting line node's data\n");
 
-		printf("\nPrinting line node's data\n");
+			printf("LTS %d, %d  ",my_data2->line_content.line_packet_lts.LTS_counter, my_data2->line_content.line_packet_lts.LTS_server_id);
+			printf("Message: %s",my_data2->line_content.line_packet_message);
+			printf("Likes: %d\n",my_data2->line_content.line_packet_likes);
 
-		printf("LTS %d, %d  ",my_data2->line_content.line_packet_lts.LTS_counter, my_data2->line_content.line_packet_lts.LTS_server_id);
-		printf("Message: %s",my_data2->line_content.line_packet_message);
-		printf("Likes: %d\n",my_data2->line_content.line_packet_likes);
+			fflush(stdout);
+		}
 		//printf("People who liked this:");
 		//print_meta(my_data2->line_meta);
 		temp=temp->next;
@@ -425,16 +469,21 @@ void print_line(linked_list *line_ll){
 
 void print_chatlist(linked_list *chat_ll){
 
-  node *temp=chat_ll->head;
-  printf("\nYour list is:\n");
-  while(temp!=NULL){
+	node *temp=chat_ll->head;
+	if(debug){
+		printf("\nYour list is:\n");
+		fflush(stdout);
+	}
+	while(temp!=NULL){
 
-  chatroom* my_data2=(chatroom*)temp->data;
-
-  printf("\nPrinting node's data\n");
-printf("\nroom: %s",my_data2->chatroom_name);
-temp=temp->next;
-}
+		chatroom* my_data2=(chatroom*)temp->data;
+		if(debug){
+			printf("\nPrinting node's data\n");
+			printf("\nroom: %s",my_data2->chatroom_name);
+			fflush(stdout);
+		}
+		temp=temp->next;
+	}
 
 
 
@@ -443,11 +492,20 @@ temp=temp->next;
 
 void print_meta(linked_list *meta_ll){
 
-	printf("\nIn print meta\n");
+	if(debug){
+		printf("\nIn print meta\n");
+		fflush(stdout);
+	}
 	node* temp=meta_ll->head;
-	printf("\nYour list is:\n");
+	if(debug){
+		printf("\nYour list is:\n");
+		fflush(stdout);
+	}
 	while(temp!=NULL){
-		printf("\n%s",temp->data); //wonder how this prints!!!
+		if(debug){
+			printf("\n%s",temp->data); //wonder how this prints!!!
+			fflush(stdout);
+		}
 		temp=temp->next;
 	}
 
