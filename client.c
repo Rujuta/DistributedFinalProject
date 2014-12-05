@@ -57,6 +57,7 @@ static void Usage();
 void process_input(char* input, client_variables *local_var);
 void initialize_chatroom(client_variables *local_var);
 
+void refresh_screen(client_variables* local_var);
 
 FILE *log1=NULL;
 
@@ -283,6 +284,7 @@ void process_input(char* input, client_variables *local_var){
 				line_lts=get_LTS(local_var,line_no);
 				//create LTS structre here
 				create_packet(LIKE, "\0", line_lts, local_var);
+				refresh_screen(local_var);
 			}
 			else{
 				printf("\nYou need to be in a chatroom to like\n");
@@ -694,7 +696,7 @@ void process_message(char* mess,client_variables *local_var){
 	switch(new_response->response_packet_type){
 
 		case R_ACK: // here is an ack to join a group, do an sp_join on receive
-			printf("\nGot ACK");
+			//printf("\nGot ACK");
 			ret = SP_join( Mbox, local_var->my_chatroom->chatroom_name);
 			if( ret < 0 ) SP_error( ret );
 			if(debug){
@@ -713,6 +715,7 @@ void process_message(char* mess,client_variables *local_var){
 				i++;
 
 			}
+			refresh_screen(local_var);
 
 			break;
 		case R_HISTORY:
