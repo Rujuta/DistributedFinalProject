@@ -188,8 +188,11 @@ void send_packet(char *group_name, response_packet *packet, server_variables *lo
 	/*If flag is 0 change group name to include server's ID */
 	if(flag==0){
 
+		char chatroom1[SIZE]="\0";
+		strcat(chatroom1,group_name);
+		
 
-		strcat(group_name,public_server_grps[local_var->machine_id]);
+		strcat(chatroom1,public_server_grps[local_var->machine_id]);
 
 	}
 	ret= SP_multicast( Mbox, AGREED_MESS,group_name, 1, sizeof(response_packet), (char*)packet );
@@ -474,6 +477,9 @@ void process_update(char* mess, server_variables *local_var){
 		case LIKE:
 			   break;
 		case MSG:
+			   if(debug){
+			   	printf("\n In update, chatroom: %s",update_packet->update_chat_room);
+			   }
 			   process_append(local_var, update_packet->update_chat_room, update_packet->update_data.data_line.line_packet_user,update_packet->update_data.data_line.line_packet_message,update_packet->update_data.data_line.line_packet_lts );
 
 			   break;
