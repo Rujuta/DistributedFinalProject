@@ -725,6 +725,7 @@ void process_message(char* mess,client_variables *local_var){
 
 			break;
 		case R_JOIN:
+				;
 				node *new_user=create_meta(new_response->data.users[0]);
 				append(local_var->my_chatroom->users,new_user);
 				refresh_screen(local_var);
