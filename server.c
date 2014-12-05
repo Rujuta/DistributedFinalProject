@@ -14,6 +14,7 @@ char *public_server_grps[6]={"dummy","s1","s2","s3","s5","s6"};
 char *private_server_grps[6]={"dummy","server1","server2","server3","server5","server6"};
 
 
+void send_packet(char *group_name, response_packet *packet, server_variables *local_var, int flag);
 void process_update(char* mess, server_variables *local_var);
 chatroom* process_join(char* group, server_variables *local_var,char *user);
 void send_update(server_variables *local_var, update* to_send);
@@ -178,15 +179,22 @@ static  void    Bye()
 
 
 /*Send a packet to the server client is connected to*/
-void send_packet(char *group_name, response_packet *packet, server_variables *local_var){
+void send_packet(char *group_name, response_packet *packet, server_variables *local_var, int flag){
 
 
 	int ret;
+	/*If flag is 0 change group name to include server's ID */
+	if(flag==0){
+	
+		
+		strcat(group_name,public_server_grps[local_var->machine_id]);
+		
+	}
 	ret= SP_multicast( Mbox, AGREED_MESS,group_name, 1, sizeof(response_packet), (char*)packet );
-	if(debug)
-		printf("Packet type is %d\n",packet->response_packet_type);
-	fprintf(log1,"\nSending a response packet\n");
-
+	if(debug) {
+		printf("\n\nPacket type is %d\n",packet->response_packet_type);
+		printf("\n\nSending a response packet to %s\n\n",group_name);
+	}
 
 	if( ret < 0 )
 	{
@@ -420,6 +428,7 @@ chatroom* process_join(char* group, server_variables *local_var, char* user){
 
 		/*Join the chat group first on spread*/
 		int ret;
+		strcat(group,public_server_grps[local_var->machine_id]);
 		ret = SP_join( Mbox, group);
 		if( ret < 0 ) {
 			SP_error( ret );
@@ -454,7 +463,11 @@ void process_update(char* mess, server_variables *local_var){
 	}
 	switch(update_packet->update_type){
 
-		case JOIN: 
+		case JOIN: process_join(update_packet->update_chat_room,local_var,update_packet->update_data.data_join.join_packet_user);
+			   response_packet *join_p= create_response_packet(R_JOIN,local_var);
+			   sprintf(join_p->data.users[0],"%s",update_packet->update_data.data_join.join_packet_user);			
+			   send_packet(update_packet->update_chat_room,join_p,local_var,0);
+
 			break;
 		case LIKE:
 			break;
@@ -507,13 +520,13 @@ void process_message(char* mess,char* sender, server_variables *local_var){
 				  append(chat_list,new_line);
 				  print_line(chat_list);
 				  //print_chatlist(local_var->chat_lists);
-				  /*Now send the same msg back to client so that it can refresh screen*/
+				  /*Now send the same msg back to all clients in group so that they can refresh screen*/
 
 				  response_packet *line_p= create_response_packet(R_MSG,local_var);
 				  line* my_data2=(line*) new_line->data;
 				  memcpy(&(line_p->data),&(my_data2->line_content),sizeof(line_packet));
 
-				  send_packet(recv_packet->request_packet_chatroom,line_p,local_var);
+				  send_packet(recv_packet->request_packet_chatroom,line_p,local_var,0);
 
 
 			  }
@@ -557,7 +570,7 @@ void process_message(char* mess,char* sender, server_variables *local_var){
 
 			   /*Send this list to sender*/
 
-			   send_packet(sender,response1,local_var);
+			   send_packet(sender,response1,local_var,1);
 
 
 			   /*Send previous msgs*/
@@ -572,7 +585,7 @@ void process_message(char* mess,char* sender, server_variables *local_var){
 				   //line_packet to_send;
 				   memcpy(&(line_p->data),&(my_data4->line_content),sizeof(line_packet));
 
-				   send_packet(sender,line_p,local_var);
+				   send_packet(sender,line_p,local_var,1);
 				   temp= temp->next;
 			   }
 
@@ -710,7 +723,7 @@ void process_client_update(request type, server_variables *local_var, request_pa
 						response_packet *line_p= create_response_packet(R_MSG,local_var);
 						memcpy(&(line_p->data),&(selected_line->line_content),sizeof(line_packet));
 
-						send_packet(recv_packet->request_packet_chatroom,line_p,local_var);
+						send_packet(recv_packet->request_packet_chatroom,line_p,local_var,0);
 
 					}
 
@@ -725,7 +738,7 @@ void process_client_update(request type, server_variables *local_var, request_pa
 						selected_line->line_content.line_packet_likes--;
 						response_packet *line_p= create_response_packet(R_MSG,local_var);
 						memcpy(&(line_p->data),&(selected_line->line_content),sizeof(line_packet));
-						send_packet(recv_packet->request_packet_chatroom,line_p,local_var);
+						send_packet(recv_packet->request_packet_chatroom,line_p,local_var,0);
 
 					}
 

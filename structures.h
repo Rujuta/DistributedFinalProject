@@ -42,7 +42,7 @@ typedef enum request{
 }request;
 
 typedef enum response{
-	R_ACK=10, R_MSG, R_HISTORY, R_VIEW
+	R_ACK=10, R_MSG, R_HISTORY, R_VIEW, R_JOIN, R_LEAVE
 }response;
 
 typedef enum list_type{

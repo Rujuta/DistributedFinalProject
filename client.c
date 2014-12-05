@@ -699,11 +699,15 @@ void process_message(char* mess,client_variables *local_var){
 
 		case R_ACK: // here is an ack to join a group, do an sp_join on receive
 			//printf("\nGot ACK");
-			ret = SP_join( Mbox, local_var->my_chatroom->chatroom_name);
+			;
+			char chatroom1[SIZE]="\0";
+			strcat(chatroom1,local_var->my_chatroom->chatroom_name);
+			strcat(chatroom1,public_server_grps[local_var->my_server]);
+			ret = SP_join( Mbox, chatroom1);
 			if( ret < 0 ) SP_error( ret );
 			if(debug){
-				fprintf(log1,"\nJoined  group");
-				fflush(log1);
+				printf("\nJoined  group: %s",chatroom1);
+				fflush(stdout);
 			}
 			local_var->my_state=IN_CHATROOM;
 			/*Put users in chat group in list of users in chat group in local var*/
@@ -720,6 +724,13 @@ void process_message(char* mess,client_variables *local_var){
 			refresh_screen(local_var);
 
 			break;
+		case R_JOIN:
+				node *new_user=create_meta(new_response->data.users[0]);
+				append(local_var->my_chatroom->users,new_user);
+				refresh_screen(local_var);
+				break;
+		case R_LEAVE:
+				break;
 		case R_HISTORY:
 			break;
 		case R_MSG:
