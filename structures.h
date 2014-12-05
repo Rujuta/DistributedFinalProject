@@ -174,6 +174,9 @@ typedef struct my_variables_server{
 	char private_group[80];
 	linked_list *chat_lists;
 	LTS my_lts;
+	linked_list *update_list;
+	linked_list *undelivered_update_list;
+	LTS my_vector[5];
 }server_variables;
 
 
@@ -189,7 +192,7 @@ typedef struct request_packet{
 typedef union response_data{
 
 	line_packet line;
-	int server_list[5];
+	int server_list[6];
 	char users[50][20];
 
 }response_data;
