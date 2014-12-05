@@ -264,7 +264,9 @@ void process_input(char* input, client_variables *local_var){
 				LTS line_lts;
 				line_lts=get_LTS(local_var,line_no);
 
-				create_packet(UNLIKE,"\0",my_lts,local_var);
+				create_packet(UNLIKE,"\0",line_lts,local_var);
+				refresh_screen(local_var);
+
 
 			}
 			else{
@@ -727,20 +729,31 @@ void process_message(char* mess,client_variables *local_var){
 			node * n1 = create_line(new_response->data.line.line_packet_user,new_response->data.line.line_packet_message,new_response->data.line.line_packet_likes,new_response->data.line.line_packet_lts);
 			int ret_val;
 			node *prev = seek(local_var->my_chatroom->chatroom_msgs, new_response->data.line.line_packet_lts, &ret_val);
-			node* tmp;
+			node *tmp, *tmp2;
 			if(ret_val ==1){
+				if(prev==NULL){
 				
-				if(prev->next==NULL){
+					tmp2=local_var->my_chatroom->chatroom_msgs->head;	
 				
+				}
+				else{
+				
+					tmp2=prev->next;
+				}
+				
+/*				if(tmp2->next==NULL){
+			
+
 					tmp=local_var->my_chatroom->chatroom_msgs->head;	
 				}
 				else{
 				
-					tmp=prev->next;
-				}
-				if(local_var->my_chatroom->start==tmp){
+					tmp=tmp2->next;
+				}*/
+				if(local_var->my_chatroom->start==tmp2){
 					local_var->my_chatroom->start=n1;
 				}
+				
 				delete(local_var->my_chatroom->chatroom_msgs, prev);
 				insert(local_var->my_chatroom->chatroom_msgs, n1, prev);
 

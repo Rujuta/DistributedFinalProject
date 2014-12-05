@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#define debug 0
+#define debug 1
 //#include "net_include.h"
 
 /*Allocate memory for a node in the list*/
