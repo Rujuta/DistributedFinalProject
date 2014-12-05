@@ -84,7 +84,7 @@ typedef struct like_packet{
 /*Update structure for joining/leaving a packet*/
 typedef struct join_packet{
 
-	char *join_packet_user;
+	char join_packet_user[20];
 }join_packet;
 
 /*Line packet which consists of the portion of the packet that needs to be sent
@@ -114,7 +114,7 @@ typedef struct update{
 
 	request update_type;
 	struct LTS update_lts;
-	char update_chat_room[80];
+	char update_chat_room[SIZE];
 	union union_update_data update_data;
 
 
@@ -174,6 +174,9 @@ typedef struct my_variables_server{
 	char private_group[80];
 	linked_list *chat_lists;
 	LTS my_lts;
+	linked_list *update_list;
+	linked_list *undelivered_update_list;
+	LTS my_vector[5];
 }server_variables;
 
 
@@ -189,7 +192,7 @@ typedef struct request_packet{
 typedef union response_data{
 
 	line_packet line;
-	int server_list[5];
+	int server_list[6];
 	char users[50][20];
 
 }response_data;
