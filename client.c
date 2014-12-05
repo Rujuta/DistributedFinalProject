@@ -38,6 +38,8 @@ static  mailbox Mbox;
 
 static int To_exit=0;
 
+static int history=1;
+
 /*Function that reads messages and processes them*/
 static  void    Read_message(int,int, void*);
 
@@ -220,6 +222,7 @@ void process_input(char* input, client_variables *local_var){
 	if (input[strlen(input) - 1] == '\n') {
 		input[strlen(input) - 1] = '\0';
 	}
+	history=1;
 	switch(input[0]){
 
 		case 'u': 
@@ -297,7 +300,9 @@ void process_input(char* input, client_variables *local_var){
 
 			break;
 		case 'h': 
+
 			if(local_var->my_state == IN_CHATROOM){
+				printf("\n Printing history for chatroom: %s\n",local_var->my_chatroom->chatroom_name);
 				create_packet(HISTORY,"\0",my_lts,local_var);
 			}
 			else{
@@ -307,7 +312,7 @@ void process_input(char* input, client_variables *local_var){
 			break;
 		case 'v':
 			if(local_var->my_state == CONNECTED || local_var->my_state == LOG_CONN || local_var->my_state == IN_CHATROOM){
-				create_packet(VIEW,NULL,my_lts,local_var);
+				create_packet(VIEW,"\0",my_lts,local_var);
 			}
 			else{
 				printf("\nYou need to be in a chatroom to unlike\n");
@@ -326,7 +331,7 @@ void process_input(char* input, client_variables *local_var){
 					leave_chatroom(local_var);
 
 				}
-				
+
 				int retv=SP_leave(Mbox,public_server_grps[local_var->my_server]);
 				if( retv < 0 ) SP_error( retv );
 
@@ -689,7 +694,7 @@ void process_message(char* mess,client_variables *local_var){
 
 
 	if(debug){
-		printf("\ngot meessage : ");
+		//printf("\ngot meessage : ");
 		fflush(stdout);
 		;
 
@@ -728,22 +733,38 @@ void process_message(char* mess,client_variables *local_var){
 
 			break;
 		case R_JOIN:
-				;
-				int retval;
-				seek_user(local_var->my_chatroom->users, new_response->data.users[0],&retval);
-				if(retval==0){
+			;
+			int retval;
+			seek_user(local_var->my_chatroom->users, new_response->data.users[0],&retval);
+			if(retval==0){
 				node *new_user=create_meta(new_response->data.users[0]);
 				append(local_var->my_chatroom->users,new_user);
-				}
-				refresh_screen(local_var);
-				break;
+			}
+			refresh_screen(local_var);
+			break;
 		case R_LEAVE:
-				break;
+			break;
 		case R_HISTORY:
+			//refresh_screen(local_var);
+			//printf("\nPrinting history to screen:\n");
+			//history=1;
+			;
+			line_packet lp=new_response->data.line;
+
+			printf("\n %d. %s: ",history,lp.line_packet_user);
+			printf("%s ",  lp.line_packet_message);
+			if(lp.line_packet_likes>0)
+				printf("\tLikes : %d",  lp.line_packet_likes);
+			history++;
+			fflush(stdout);
+			//print_display();
+
 			break;
 		case R_MSG:
-			printf("\ngot meessage : %s",new_response->data.line.line_packet_message);
-			fflush(stdout);
+			if(debug){
+				printf("\ngot meessage : %s",new_response->data.line.line_packet_message);
+				fflush(stdout);
+			}
 			;
 			node * n1 = create_line(new_response->data.line.line_packet_user,new_response->data.line.line_packet_message,new_response->data.line.line_packet_likes,new_response->data.line.line_packet_lts);
 			int ret_val;
@@ -751,28 +772,28 @@ void process_message(char* mess,client_variables *local_var){
 			node *tmp, *tmp2;
 			if(ret_val ==1){
 				if(prev==NULL){
-				
+
 					tmp2=local_var->my_chatroom->chatroom_msgs->head;	
-				
+
 				}
 				else{
-				
+
 					tmp2=prev->next;
 				}
-				
-/*				if(tmp2->next==NULL){
-			
 
-					tmp=local_var->my_chatroom->chatroom_msgs->head;	
-				}
-				else{
-				
-					tmp=tmp2->next;
-				}*/
+				/*				if(tmp2->next==NULL){
+
+
+								tmp=local_var->my_chatroom->chatroom_msgs->head;	
+								}
+								else{
+
+								tmp=tmp2->next;
+								}*/
 				if(local_var->my_chatroom->start==tmp2){
 					local_var->my_chatroom->start=n1;
 				}
-				
+
 				delete(local_var->my_chatroom->chatroom_msgs, prev);
 				insert(local_var->my_chatroom->chatroom_msgs, n1, prev);
 
@@ -795,7 +816,19 @@ void process_message(char* mess,client_variables *local_var){
 			refresh_screen(local_var);
 
 			break;
-		case R_VIEW:
+		case R_VIEW: /*Got list of servers, need to show to screen*/
+			;     
+			int k=1;
+			refresh_screen(local_var);
+			printf("\nServers in current partition are: \t");
+			while(k<6){
+
+				if(new_response->data.server_list[k]!=0){
+					printf("%d ",new_response->data.server_list[k]);
+				}
+				k++;
+			}
+			print_display();
 			break;
 
 	}

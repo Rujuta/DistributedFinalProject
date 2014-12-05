@@ -86,6 +86,12 @@ int main(int argc, char* argv[]){
 	local_var.timeout.sec=5;
 	local_var.timeout.usec=0;
 
+	/*Initialize all members to be 0 first*/
+	local_var.current_members[0]=0;
+	int l;
+	for(l=1;l<6;l++){
+		local_var.current_members[l]=0;
+	}
 	//Set my local counter 
 	local_var.my_lts.LTS_counter=0;
 	local_var.my_lts.LTS_server_id=local_var.machine_id;
@@ -102,7 +108,8 @@ int main(int argc, char* argv[]){
 	LTS init;
 	init.LTS_counter=-1;
 	init.LTS_server_id=-1;
-	while(k<=5){
+	local_var.my_vector[0]=init;
+	while(k<6){
 
 		local_var.my_vector[k]=init;
 		k++;
@@ -191,13 +198,13 @@ void send_packet(char *group_name, response_packet *packet, server_variables *lo
 	if(flag==0){
 
 		strcat(chatroom1,group_name);
-		
+
 
 		strcat(chatroom1,public_server_grps[local_var->machine_id]);
 
 	}
 	else{
-		 strcat(chatroom1,group_name);
+		strcat(chatroom1,group_name);
 	}
 	ret= SP_multicast( Mbox, AGREED_MESS,chatroom1, 1, sizeof(response_packet), (char*)packet );
 	if(debug) {
@@ -332,6 +339,21 @@ static  void    Read_message(int a, int b, void *local_var_arg)
 			{
 				printf("\nDue to join of  %s\n",  memb_info.changed_member);
 				fprintf(log1,"Due to the JOIN of %s\n", memb_info.changed_member );
+				printf("\nGroup joined: %s",sender);
+				if(strcmp(sender,SERVER_GRP)==0){
+
+					/*Extract ID from the group name*/
+					int id;
+					char* str=strtok(memb_info.changed_member,"#");
+					char* integer=strtok(str,"s");
+					id=atoi(integer);
+					local_var->current_members[id]=1;
+					if(debug){
+						printf("\nServer with id :%d joined",id);
+						fflush(stdout);
+					}
+
+				}
 			}else if( Is_caused_leave_mess( service_type ) ){
 				printf("Due to the LEAVE of %s\n", memb_info.changed_member );
 			}else if( Is_caused_disconnect_mess( service_type ) ){
@@ -482,7 +504,7 @@ void process_update(char* mess, server_variables *local_var){
 			   break;
 		case MSG:
 			   if(debug){
-			   	printf("\n In update, chatroom: %s",update_packet->update_chat_room);
+				   printf("\n In update, chatroom: %s",update_packet->update_chat_room);
 			   }
 			   process_append(local_var, update_packet->update_chat_room, update_packet->update_data.data_line.line_packet_user,update_packet->update_data.data_line.line_packet_message,update_packet->update_data.data_line.line_packet_lts );
 
@@ -624,8 +646,54 @@ void process_message(char* mess,char* sender, server_variables *local_var){
 
 			   break;
 		case HISTORY:
+			   ;
+			   //seek chatroom first
+			   node* f_room;
+			   int ret_val4;
+			   node* room2= seek_chatroom(local_var->chat_lists, recv_packet->request_packet_chatroom,&ret_val4);
+			   if(ret_val4==1){
+				   if(room2==NULL){
+
+					   room2=local_var->chat_lists->head;
+
+				   }
+				   else{
+
+					   room2=room2->next;
+				   }
+				   chatroom* c=(chatroom*)room2->data;
+				   node* t=c->chatroom_msgs->head;
+				   while(t!=NULL){
+
+					   response_packet *hp= create_response_packet(R_HISTORY,local_var);
+					   line* my_datah=(line*)t->data;
+					   memcpy(&(hp->data),&(my_datah->line_content),sizeof(line_packet));
+					   send_packet(sender,hp,local_var,1);
+					   t=t->next;
+				   }
+			   }
+			   else{
+
+				   if(debug){
+
+					   printf("\nSome error, this guy doesn't have chatroom history\n");
+				   }
+			   }
+
 			   break;
-		case VIEW:
+		case VIEW: /*Check current members in server group*/
+			   ;
+			   response_packet *v_response=create_response_packet(R_VIEW,local_var);
+			   int m;
+			   for(m=1;m<6;m++){
+				   if(local_var->current_members[m]==1){
+					   v_response->data.server_list[m]=m;
+				   }
+				   else{
+					   v_response->data.server_list[m]=0;
+				   }
+			   }
+			   send_packet(sender,v_response,local_var,1); 
 			   break;
 		case LIKE:
 			   if(debug){
@@ -673,7 +741,7 @@ void propagate_append_update(server_variables *local_var,line_packet lp, LTS upd
 void send_update(server_variables *local_var, update* to_send){
 
 	int ret;
-	ret=SP_multicast(Mbox,AGREED_MESS,SERVER_GRP,1, sizeof(update),(char*)to_send);
+	ret=SP_multicast(Mbox,AGREED_MESS|SELF_DISCARD,SERVER_GRP,1, sizeof(update),(char*)to_send);
 	if(ret<0){
 		SP_error(ret);
 		Bye();
