@@ -14,6 +14,10 @@ char *public_server_grps[6]={"dummy","s1","s2","s3","s5","s6"};
 char *private_server_grps[6]={"dummy","server1","server2","server3","server5","server6"};
 
 
+void process_update(char* mess, server_variables *local_var);
+chatroom* process_join(char* group, server_variables *local_var,char *user);
+void send_update(server_variables *local_var, update* to_send);
+void propagate_join_update(server_variables *local_var,request_packet* recv_packet, LTS update_lts);
 void process_client_update(request type, server_variables *local_var, request_packet* recv_packet);
 response_packet* create_response_packet(response type, server_variables* local_var);
 
@@ -87,6 +91,19 @@ int main(int argc, char* argv[]){
 	 * for one chat room*/
 	local_var.chat_lists=(linked_list*)get_linked_list(LIST_CHATROOM);
 
+	/*Initialize an update list. One for updates to put to file and another one to handle non delivered msgs*/
+	local_var.update_list=(linked_list*)get_linked_list(LIST_UPDATE);
+	local_var.undelivered_update_list=(linked_list*)get_linked_list(LIST_UPDATE);
+
+	int k=1;
+	LTS init;
+	init.LTS_counter=-1;
+	init.LTS_server_id=-1;
+	while(k<=5){
+
+		local_var.my_vector[k]=init;
+		k++;
+	}
 	/*Here you will load old DATA of chatrooms into the chatlists structure*/
 	//TODO
 	connect_to_spread(&local_var);
@@ -272,8 +289,13 @@ static  void    Read_message(int a, int b, void *local_var_arg)
 			fprintf(log1,"message from %s, of type %d,(%d bytes)\n",
 					sender, mess_type,  ret );
 		}
-		process_message(mess,sender,local_var);
-
+		if(strcmp(target_groups[0],SERVER_GRP)==0){
+			printf("\nGot update");
+			process_update(mess,local_var);
+		}
+		else{
+			process_message(mess,sender,local_var);
+		}
 
 	}
 
@@ -325,6 +347,124 @@ static  void    Read_message(int a, int b, void *local_var_arg)
 
 
 
+}
+
+chatroom* process_join(char* group, server_variables *local_var, char* user){
+
+	/*First check if this chatroom exists in the list
+	 * i.e seek the list for the location of the chatroom
+	 * if null is returned then the chatroom doesn't exist
+	 * in that case do as below */
+
+	int ret_val;
+	node *prev, *temp, *user_check;
+	chatroom *my_data3;
+	prev= seek_chatroom(local_var->chat_lists,group,&ret_val);
+
+	//chatroom found
+	if(ret_val==1){
+		//chat room exists
+
+		//send all the data in chat room so far
+		if(prev==NULL){
+			temp=local_var->chat_lists->head;
+		}
+		else{
+			temp=prev->next;
+		}
+
+
+
+		my_data3=(chatroom*)temp->data;
+
+		user_check=seek_user(my_data3->users,user,&ret_val);
+
+		if(ret_val==1){
+			if(user_check==NULL){
+				//user exists and is the first user 
+				user_check=my_data3->users->head;
+
+			}
+			else{
+
+				user_check=user_check->next;
+
+			}
+			//increment count of user
+
+
+			((meta*)user_check->data)->cnt++;
+
+
+		}
+		else{
+
+			node* user_node=create_meta(user);
+			append(my_data3->users,user_node);
+		}
+
+
+	}
+	else{
+
+
+		node* newly_created_room=(node*)create_chatroom(group);
+		append(local_var->chat_lists,newly_created_room);
+
+
+		node* user_node=create_meta(user);
+		my_data3=(chatroom*)newly_created_room->data;
+		append(my_data3->users,user_node);
+
+		meta* u=(meta*)my_data3->users->head->data;
+
+		/*Join the chat group first on spread*/
+		int ret;
+		ret = SP_join( Mbox, group);
+		if( ret < 0 ) {
+			SP_error( ret );
+			Bye();
+		}
+
+	}
+
+
+	return my_data3;
+}
+void process_update(char* mess, server_variables *local_var){
+
+	int ret;
+	update* update_packet;
+	update_packet=(update*)mess;
+	node *temp, *prev;
+
+	node* new_update=create_update(update_packet->update_type, update_packet->update_lts, update_packet->update_chat_room,update_packet->update_data);
+	/*Do causality check*/
+	//int flag= check_causality(local_var,update_packet->update_lts);
+	int flag=0;
+	if(flag==0){
+		/*Causally dependent*/
+
+		append(local_var->undelivered_update_list,new_update);
+	}
+	else{
+
+		append(local_var->update_list,new_update);
+
+	}
+	switch(update_packet->update_type){
+
+		case JOIN: 
+			break;
+		case LIKE:
+			break;
+		case MSG:
+			break;
+		case UNLIKE:
+			break;
+		case LEAVE:
+			break;
+	}
 }
 
 void process_message(char* mess,char* sender, server_variables *local_var){
@@ -384,6 +524,11 @@ void process_message(char* mess,char* sender, server_variables *local_var){
 
 			  break;
 		case UNLIKE:
+			  if(debug){
+				  printf("\nGot message::: %d type",recv_packet->request_packet_type);
+			  }
+			  process_client_update(recv_packet->request_packet_type,local_var,recv_packet);
+
 			  break;
 		case JOIN: printf("\nGot a message of join");
 			   printf("\nRequest to join chat room: %s",recv_packet->request_packet_data);
@@ -391,123 +536,50 @@ void process_message(char* mess,char* sender, server_variables *local_var){
 			   sscanf(recv_packet->request_packet_data,"%s",group);
 			   local_var->my_lts.LTS_counter++;
 
-
-			   /*First check if this chatroom exists in the list
-			    * i.e seek the list for the location of the chatroom
-			    * if null is returned then the chatroom doesn't exist
-			    * in that case do as below */
-
-			   prev= seek_chatroom(local_var->chat_lists,group,&ret_val);
-
 			   response_packet *response1=create_response_packet(R_ACK,local_var);
-			   if(ret_val==1){
-				   //chat room exists
 
-				   //send all the data in chat room so far
-				   if(prev==NULL){
-					   temp=local_var->chat_lists->head;
-				   }
-				   else{
-					   temp=prev->next;
-				   }
+			   my_data3=process_join(group,local_var,recv_packet->request_packet_user);
 
+			   /*Create a list of users and send*/
+			   node* current_user=my_data3->users->head;
+			   int i=0;
+			   while(current_user!=NULL){
 
-
-				   my_data3=(chatroom*)temp->data;
-
-				   user_check=seek_user(my_data3->users,recv_packet->request_packet_user,&ret_val);
-
-				   if(ret_val==1){
-					   if(user_check==NULL){
-						   //user exists and is the first user 
-						   user_check=my_data3->users->head;
-
-					   }
-					   else{
-
-						   user_check=user_check->next;
-
-					   }
-					   //increment count of user
-
-
-					   ((meta*)user_check->data)->cnt++;
-
-
-				   }
-				   else{
-
-					   node* user_node=create_meta(recv_packet->request_packet_user);
-					   append(my_data3->users,user_node);
-				   }
-
-
-
-				   /*Create a list of users and send*/
-				   node* current_user=my_data3->users->head;
-				   int i=0;
-				   while(current_user!=NULL){
-
-					   meta* user_m=(meta*)current_user->data;
-					   //char* user_name=user_m->meta_user;
-					   sprintf(response1->data.users[i],"%s",user_m->meta_user);
-					   current_user=current_user->next;
-					   i++;
-
-				   }
-				   sprintf(response1->data.users[i],"%s","\0");
-
-
-				   /*Send this list to sender*/
-
-				   send_packet(sender,response1,local_var);
-
-
-				   //send_packet(group,response1, local_var);
-				   //
-				   //send previous msgs of chat grp to user
-				   linked_list* msgs=my_data3->chatroom_msgs;
-				   temp= msgs->head;
-
-
-				   while(temp!=NULL){
-
-					   response_packet *line_p= create_response_packet(R_MSG,local_var);
-					   line* my_data4=(line*)temp->data;
-					   //line_packet to_send;
-					   memcpy(&(line_p->data),&(my_data4->line_content),sizeof(line_packet));
-
-					   send_packet(sender,line_p,local_var);
-					   temp= temp->next;
-				   }
-			   }
-			   else{
-				   node* new_chatroom=(node*)create_chatroom(group);
-				   append(local_var->chat_lists,new_chatroom);
-
-
-				   node* user_node=create_meta(recv_packet->request_packet_user);
-				   chatroom* newly_created_room=(chatroom*)new_chatroom->data;
-				   append(newly_created_room->users,user_node);
-
-				   meta* u=(meta*)newly_created_room->users->head->data;
-				   sprintf(response1->data.users[0],"%s",u->meta_user);
-
-				   printf("\nUser is :: %s",u->meta_user);
-				   printf("\nUser just joined is%s",response1->data.users[0]);
-
-				   sprintf(response1->data.users[1],"%s","\0");
-				   send_packet(sender,response1,local_var);
-				   print_meta(newly_created_room->users);
-				   //print_chatlist(local_var->chat_lists);
-				   /*Join the chat group first on spread*/
-				   ret = SP_join( Mbox, group);
-				   if( ret < 0 ) {
-					   SP_error( ret );
-					   Bye();
-				   }
+				   meta* user_m=(meta*)current_user->data;
+				   //char* user_name=user_m->meta_user;
+				   sprintf(response1->data.users[i],"%s",user_m->meta_user);
+				   current_user=current_user->next;
+				   i++;
 
 			   }
+			   sprintf(response1->data.users[i],"%s","\0");
+
+
+			   /*Send this list to sender*/
+
+			   send_packet(sender,response1,local_var);
+
+
+			   /*Send previous msgs*/
+			   linked_list* msgs=my_data3->chatroom_msgs;
+			   temp= msgs->head;
+
+
+			   while(temp!=NULL){
+
+				   response_packet *line_p= create_response_packet(R_MSG,local_var);
+				   line* my_data4=(line*)temp->data;
+				   //line_packet to_send;
+				   memcpy(&(line_p->data),&(my_data4->line_content),sizeof(line_packet));
+
+				   send_packet(sender,line_p,local_var);
+				   temp= temp->next;
+			   }
+
+
+
+			   /*Create a join update*/
+			   propagate_join_update(local_var,recv_packet, local_var->my_lts);
 
 			   break;
 		case HISTORY:
@@ -516,80 +588,117 @@ void process_message(char* mess,char* sender, server_variables *local_var){
 			   break;
 		case LIKE:
 			   if(debug){
-			   	printf("\nGot message::: %d type",recv_packet->request_packet_type);
+				   printf("\nGot message::: %d type",recv_packet->request_packet_type);
 			   }
 			   process_client_update(recv_packet->request_packet_type,local_var,recv_packet);
-			   break;
 
+			   /*Create an update for like*/
+			   break;
 
 	}
 }
 
 
+
+void propagate_join_update(server_variables *local_var,request_packet* recv_packet, LTS update_lts){
+
+	join_packet jp;
+	sprintf(jp.join_packet_user,recv_packet->request_packet_user);
+	node* new_update;
+	union_update_data jpacket;
+	memcpy(&jpacket,&jp,sizeof(jp));
+	new_update=create_update(JOIN,update_lts,recv_packet->request_packet_chatroom,jpacket);
+	append(local_var->update_list,new_update);
+	update* to_send=(update*)new_update->data;
+
+	send_update(local_var,to_send);
+
+}
+
+
+void send_update(server_variables *local_var, update* to_send){
+
+	int ret;
+	ret=SP_multicast(Mbox,AGREED_MESS,SERVER_GRP,1, sizeof(update),(char*)to_send);
+	if(ret<0){
+		SP_error(ret);
+		Bye();
+	}
+	if(debug){
+
+		printf("\n Sent update");
+		fflush(stdout);
+		printf("\nLeaving send");
+	}
+
+}
+
+
 void process_client_update(request type, server_variables *local_var, request_packet* recv_packet){
 
-	switch(type){
 
 
-		case LIKE:
-			;
+	;
+	if(debug){
+		printf("\nGot LIKE\n");
+	}
+	char group[SIZE];
+	sscanf(recv_packet->request_packet_chatroom,"%s",group);
+	//local_var->my_lts.LTS_counter++;
+	LTS to_find;
+
+	//got the LTS to seek
+	to_find=recv_packet->request_packet_lts;
+
+	//get chatroom from msg
+
+
+
+	//get LTS of msg that has been liked
+	//
+
+	//seek for the LTS in the chatroom that I have 
+	int ret_val;
+	if(debug){
+		printf("\nChat room to seek: %s",group);
+		fflush(stdout);
+	}
+	node* seeked_room=seek_chatroom(local_var->chat_lists,group,&ret_val);
+	if(ret_val==1){
+
+		if(debug){
+			printf("\nGot room");
+		}
+		if(seeked_room==NULL){ 
+			seeked_room=local_var->chat_lists->head;
+		}
+		else{
+			seeked_room=seeked_room->next;
+		}
+
+		chatroom* got_room=(chatroom*)seeked_room->data;
+		int ret_val2;
+		node* to_modify=seek(got_room->chatroom_msgs,to_find,&ret_val2);
+		if(ret_val2==1){
+
 			if(debug){
-				printf("\nGot LIKE\n");
+				printf("\nGot line");
 			}
-			char group[SIZE];
-			sscanf(recv_packet->request_packet_chatroom,"%s",group);
-			//local_var->my_lts.LTS_counter++;
-			LTS to_find;
-
-			//got the LTS to seek
-			to_find=recv_packet->request_packet_lts;
-
-			//get chatroom from msg
-
-
-
-			//get LTS of msg that has been liked
-			//
-
-			//seek for the LTS in the chatroom that I have 
-			int ret_val;
-			if(debug){
-				printf("\nChat room to seek: %s",group);
-				fflush(stdout);
+			if(to_modify==NULL){
+				to_modify=got_room->chatroom_msgs->head;
 			}
-			node* seeked_room=seek_chatroom(local_var->chat_lists,group,&ret_val);
-			if(ret_val==1){
+			else{
+				to_modify=to_modify->next;
+			}
 
-				if(debug){
-					printf("\nGot room");
-				}
-				if(seeked_room==NULL){ 
-					seeked_room=local_var->chat_lists->head;
-				}
-				else{
-					seeked_room=seeked_room->next;
-				}
+			line* selected_line=(line*)to_modify->data;
 
-				chatroom* got_room=(chatroom*)seeked_room->data;
-				int ret_val2;
-				node* to_modify=seek(got_room->chatroom_msgs,to_find,&ret_val2);
-				if(ret_val2==1){
+			//seek for user to see if user has liked
+			int ret_val3;
+			node* user1=seek_user(selected_line->line_meta, recv_packet->request_packet_user,&ret_val3);
+			switch(type){
 
-					if(debug){
-						printf("\nGot line");
-					}
-					if(to_modify==NULL){
-						to_modify=got_room->chatroom_msgs->head;
-					}
-					else{
-						to_modify=to_modify->next;
-					}
-
-					line* selected_line=(line*)to_modify->data;
-
-					//seek for user to see if user has liked
-					int ret_val3;
-					node* user1=seek_user(selected_line->line_meta, recv_packet->request_packet_user,&ret_val3);
+				case LIKE: 
 					if(ret_val3!=1){
 						if(debug){
 							printf("\nGot user");
@@ -602,23 +711,41 @@ void process_client_update(request type, server_variables *local_var, request_pa
 						memcpy(&(line_p->data),&(selected_line->line_content),sizeof(line_packet));
 
 						send_packet(recv_packet->request_packet_chatroom,line_p,local_var);
+
 					}
-				}
 
+					break;
+
+				case UNLIKE: //found something to unlike
+					if(ret_val3==1){
+						if(debug){
+							printf("\nGot user");
+						}
+						delete(selected_line->line_meta,user1);
+						selected_line->line_content.line_packet_likes--;
+						response_packet *line_p= create_response_packet(R_MSG,local_var);
+						memcpy(&(line_p->data),&(selected_line->line_content),sizeof(line_packet));
+						send_packet(recv_packet->request_packet_chatroom,line_p,local_var);
+
+					}
+
+					break;
 			}
-
-
-			//Once LTS is found
-			//check if the same user has liked it or not in the list of users
-
-			//if liked, already, do nothing 
-			//otherwise increment no of likes, add user to liked list
-
-
-			break;
-
+		}
 
 	}
+
+
+	//Once LTS is found
+	//check if the same user has liked it or not in the list of users
+
+	//if liked, already, do nothing 
+	//otherwise increment no of likes, add user to liked list
+
+
+
+
+
 
 }
 
