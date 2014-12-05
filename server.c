@@ -206,7 +206,7 @@ void send_packet(char *group_name, response_packet *packet, server_variables *lo
 	else{
 		strcat(chatroom1,group_name);
 	}
-	ret= SP_multicast( Mbox, AGREED_MESS,chatroom1, 1, sizeof(response_packet), (char*)packet );
+	ret= SP_multicast( Mbox, AGREED_MESS|SELF_DISCARD,chatroom1, 1, sizeof(response_packet), (char*)packet );
 	if(debug) {
 		printf("\n\nPacket type is %d\n",packet->response_packet_type);
 		printf("\n\nSending a response packet to %s\n\n",chatroom1);
