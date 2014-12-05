@@ -13,6 +13,8 @@
 char *public_server_grps[6]={"dummy","s1","s2","s3","s5","s6"};
 char *private_server_grps[6]={"dummy","server1","server2","server3","server5","server6"};
 
+void propagate_append_update(server_variables *local_var,line_packet lp, LTS update_lts,char* room);
+line_packet process_append(server_variables *local_var,char *croom1, char* user, char* msg_data, LTS line_lts);
 
 void send_packet(char *group_name, response_packet *packet, server_variables *local_var, int flag);
 void process_update(char* mess, server_variables *local_var);
@@ -185,10 +187,10 @@ void send_packet(char *group_name, response_packet *packet, server_variables *lo
 	int ret;
 	/*If flag is 0 change group name to include server's ID */
 	if(flag==0){
-	
-		
+
+
 		strcat(group_name,public_server_grps[local_var->machine_id]);
-		
+
 	}
 	ret= SP_multicast( Mbox, AGREED_MESS,group_name, 1, sizeof(response_packet), (char*)packet );
 	if(debug) {
@@ -468,18 +470,71 @@ void process_update(char* mess, server_variables *local_var){
 			   sprintf(join_p->data.users[0],"%s",update_packet->update_data.data_join.join_packet_user);			
 			   send_packet(update_packet->update_chat_room,join_p,local_var,0);
 
-			break;
+			   break;
 		case LIKE:
-			break;
+			   break;
 		case MSG:
-			break;
+			   process_append(local_var, update_packet->update_chat_room, update_packet->update_data.data_line.line_packet_user,update_packet->update_data.data_line.line_packet_message,update_packet->update_data.data_line.line_packet_lts );
+
+			   break;
 		case UNLIKE:
-			break;
+			   break;
 		case LEAVE:
-			break;
+			   break;
 	}
 }
 
+line_packet process_append(server_variables *local_var,char *croom1, char* user, char* msg_data, LTS line_lts){
+
+	node* prev;
+	int ret_val;
+	printf("\nGot msg of type append\n");
+	//Here need to find out the user is part of which chat room
+	//Append to that chat room
+	//From message, the chatroom data is obtained
+	if(debug){
+		printf("\nGoing to seek chatroom %s\n",croom1);
+	}
+	print_chatlist(local_var->chat_lists);
+	fflush(stdout);
+	prev=seek_chatroom(local_var->chat_lists,croom1,&ret_val);
+	printf("\n ret val --%d ",ret_val);
+	chatroom *croom;
+	fflush(stdout);
+	line* my_data2;
+	if(ret_val==1){
+
+
+		node* new_line=create_line(user,msg_data,0, line_lts);
+		if(prev==NULL){
+			croom=(chatroom*)local_var->chat_lists->head->data;
+		}
+		else{
+			croom	= (chatroom*)prev->next->data;
+		} 
+		linked_list* chat_list=croom->chatroom_msgs;
+		append(chat_list,new_line);
+		print_line(chat_list);
+		//print_chatlist(local_var->chat_lists);
+		/*Now send the same msg back to all clients in group so that they can refresh screen*/
+
+		response_packet *line_p= create_response_packet(R_MSG,local_var);
+		my_data2=(line*) new_line->data;
+		memcpy(&(line_p->data),&(my_data2->line_content),sizeof(line_packet));
+
+		send_packet(croom1,line_p,local_var,0);
+
+
+	}
+	else{
+		printf("\nChatroom doesn't exist, some error in code\n");
+	}
+	return (my_data2->line_content);
+
+
+
+
+}
 void process_message(char* mess,char* sender, server_variables *local_var){
 
 	int ret;
@@ -492,57 +547,20 @@ void process_message(char* mess,char* sender, server_variables *local_var){
 	chatroom *croom, *my_data3;
 	switch(recv_packet->request_packet_type){
 
-		case MSG: printf("\nGot msg of type append\n");
-			  //Here need to find out the user is part of which chat room
-			  //Append to that chat room
-			  //From message, the chatroom data is obtained
-			  if(debug){
-				  printf("\nGoing to seek chatroom %s\n",recv_packet->request_packet_chatroom);
-			  }
-			  print_chatlist(local_var->chat_lists);
-			  fflush(stdout);
-			  prev=seek_chatroom(local_var->chat_lists,recv_packet->request_packet_chatroom,&ret_val);
-			  printf("\n ret val --%d ",ret_val);
-			  fflush(stdout);
+		case MSG:  			  
+			local_var->my_lts.LTS_counter++;
 
-			  if(ret_val==1){
+			line_packet lp=process_append(local_var,recv_packet->request_packet_chatroom, recv_packet->request_packet_user, recv_packet->request_packet_data, local_var->my_lts);
+			propagate_append_update(local_var, lp, local_var->my_lts, recv_packet->request_packet_chatroom);
 
-				  local_var->my_lts.LTS_counter++;
-
-				  node* new_line=create_line(recv_packet->request_packet_user,recv_packet->request_packet_data,0, local_var->my_lts);
-				  if(prev==NULL){
-					  croom=(chatroom*)local_var->chat_lists->head->data;
-				  }
-				  else{
-					  croom	= (chatroom*)prev->next->data;
-				  } 
-				  linked_list* chat_list=croom->chatroom_msgs;
-				  append(chat_list,new_line);
-				  print_line(chat_list);
-				  //print_chatlist(local_var->chat_lists);
-				  /*Now send the same msg back to all clients in group so that they can refresh screen*/
-
-				  response_packet *line_p= create_response_packet(R_MSG,local_var);
-				  line* my_data2=(line*) new_line->data;
-				  memcpy(&(line_p->data),&(my_data2->line_content),sizeof(line_packet));
-
-				  send_packet(recv_packet->request_packet_chatroom,line_p,local_var,0);
-
-
-			  }
-			  else{
-				  printf("\nChatroom doesn't exist, some error in code\n");
-			  }
-
-
-			  break;
+			break;
 		case UNLIKE:
-			  if(debug){
-				  printf("\nGot message::: %d type",recv_packet->request_packet_type);
-			  }
-			  process_client_update(recv_packet->request_packet_type,local_var,recv_packet);
+			if(debug){
+				printf("\nGot message::: %d type",recv_packet->request_packet_type);
+			}
+			process_client_update(recv_packet->request_packet_type,local_var,recv_packet);
 
-			  break;
+			break;
 		case JOIN: printf("\nGot a message of join");
 			   printf("\nRequest to join chat room: %s",recv_packet->request_packet_data);
 			   char group[SIZE];
@@ -628,6 +646,19 @@ void propagate_join_update(server_variables *local_var,request_packet* recv_pack
 
 }
 
+void propagate_append_update(server_variables *local_var,line_packet lp, LTS update_lts,char* room){
+
+
+	node* new_update;
+	union_update_data lpacket;
+	memcpy(&lpacket,&lp,sizeof(lp));
+	new_update=create_update(MSG,update_lts,room,lpacket);
+	append(local_var->update_list,new_update);
+	update* to_send=(update*)new_update->data;
+
+	send_update(local_var,to_send);
+
+}
 
 void send_update(server_variables *local_var, update* to_send){
 
