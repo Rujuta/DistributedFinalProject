@@ -481,7 +481,8 @@ void process_update(char* mess, server_variables *local_var){
 	node* new_update=create_update(update_packet->update_type, update_packet->update_lts, update_packet->update_chat_room,update_packet->update_data);
 	/*Do causality check*/
 	//int flag= check_causality(local_var,update_packet->update_lts);
-	int flag=0;
+	int flag=1;
+
 	if(flag==0){
 		/*Causally dependent*/
 
@@ -491,28 +492,30 @@ void process_update(char* mess, server_variables *local_var){
 
 		append(local_var->update_list,new_update);
 
-	}
-	switch(update_packet->update_type){
+		/*Adapt to new LTS counter*/
+		local_var->my_lts.LTS_counter=update_packet->update_lts.LTS_counter;
+		switch(update_packet->update_type){
 
-		case JOIN: process_join(update_packet->update_chat_room,local_var,update_packet->update_data.data_join.join_packet_user);
-			   response_packet *join_p= create_response_packet(R_JOIN,local_var);
-			   sprintf(join_p->data.users[0],"%s",update_packet->update_data.data_join.join_packet_user);			
-			   send_packet(update_packet->update_chat_room,join_p,local_var,0);
+			case JOIN: process_join(update_packet->update_chat_room,local_var,update_packet->update_data.data_join.join_packet_user);
+				   response_packet *join_p= create_response_packet(R_JOIN,local_var);
+				   sprintf(join_p->data.users[0],"%s",update_packet->update_data.data_join.join_packet_user);			
+				   send_packet(update_packet->update_chat_room,join_p,local_var,0);
 
-			   break;
-		case LIKE:
-			   break;
-		case MSG:
-			   if(debug){
-				   printf("\n In update, chatroom: %s",update_packet->update_chat_room);
-			   }
-			   process_append(local_var, update_packet->update_chat_room, update_packet->update_data.data_line.line_packet_user,update_packet->update_data.data_line.line_packet_message,update_packet->update_data.data_line.line_packet_lts );
+				   break;
+			case LIKE:
+				   break;
+			case MSG:
+				   if(debug){
+					   printf("\n In update, chatroom: %s",update_packet->update_chat_room);
+				   }
+				   process_append(local_var, update_packet->update_chat_room, update_packet->update_data.data_line.line_packet_user,update_packet->update_data.data_line.line_packet_message,update_packet->update_data.data_line.line_packet_lts );
 
-			   break;
-		case UNLIKE:
-			   break;
-		case LEAVE:
-			   break;
+				   break;
+			case UNLIKE:
+				   break;
+			case LEAVE:
+				   break;
+		}
 	}
 }
 
