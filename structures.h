@@ -84,7 +84,7 @@ typedef struct like_packet{
 /*Update structure for joining/leaving a packet*/
 typedef struct join_packet{
 
-	char *join_packet_user;
+	char join_packet_user[20];
 }join_packet;
 
 /*Line packet which consists of the portion of the packet that needs to be sent
@@ -114,7 +114,7 @@ typedef struct update{
 
 	request update_type;
 	struct LTS update_lts;
-	char update_chat_room[80];
+	char update_chat_room[SIZE];
 	union union_update_data update_data;
 
 
