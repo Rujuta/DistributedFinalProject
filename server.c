@@ -10,6 +10,7 @@
 #define MAXINT 2147483647
 
 
+void send_users(server_variables *local_var);
 void send_my_updates(server_variables *local_var, int min);
 void create_merge_packet(server_variables *local_var);
 void process_leave_chatroom(char* group, server_variables *local_var, char* user, int new_server);
@@ -368,6 +369,14 @@ void reconcile_merge(server_variables *local_var){
 
 
 	}
+
+	if(debug){
+	
+		printf("\nCalling send USERS \n");
+		fflush(stdout);
+	}
+
+	send_users(local_var);
 
 
 	if(debug){
@@ -1023,6 +1032,59 @@ void handle_user_mappings(server_variables *local_var, int new_server, char* gro
 
 }
 
+
+void send_users(server_variables *local_var){
+
+	if(debug){
+	
+	
+		printf("\nGoing to send list of attendees\n");
+		fflush(stdout);
+	}
+
+
+	node* prev,*tmp;
+
+
+	/*Get users from this server in my chatrooms*/
+	tmp=local_var->server_chats[local_var->machine_id]->head;
+	while(tmp!=NULL){
+
+		/*Loop through each chat room*/
+
+		/*Get head till head == NULL (Delete each head)*/
+		chatroom* my_data=(chatroom*) tmp->data;
+
+		node* m= my_data->users->head;
+		while(m!=NULL){
+
+			meta* u= (meta*)m->data;
+
+			join_packet join_p1;
+			sprintf(join_p1.join_packet_user,"%s",u->meta_user);
+			node* new_update;
+			union_update_data jpacket;
+			memcpy(&jpacket,&(join_p1),sizeof(join_p1));
+			local_var->my_lts.LTS_counter++;
+			new_update=create_update(JOIN,local_var->my_lts,my_data->chatroom_name,jpacket);
+			
+			
+			update* to_send=(update*)new_update->data;
+			send_update(local_var,to_send);
+
+			if(debug){
+			
+				printf("\nSending join for user name : %s...... chatroom : %s\n",u->meta_user,my_data->chatroom_name);
+				fflush(stdout);
+			
+			}
+			m=m->next;
+		}
+		tmp=tmp->next;
+	}
+
+
+}
 chatroom* process_join(char* group, server_variables *local_var, char* user, int new_server){
 
 	/*First check if this chatroom exists in the list
