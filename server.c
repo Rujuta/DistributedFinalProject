@@ -14,8 +14,8 @@ void process_leave_chatroom(char* group, server_variables *local_var, char* user
 void reconcile_partition(server_variables *local_var, int server_id);
 void handle_user_mappings(server_variables *local_var, int new_server, char* group, char* user, int flag);
 void propagate_like_update( server_variables *local_var,request_packet* recv_packet, LTS update_lts, request);
-char *public_server_grps[6]={"dummy","s1","s2","s3","s5","s6"};
-char *private_server_grps[6]={"dummy","server1","server2","server3","server5","server6"};
+char *public_server_grps[6]={"dummy","s1","s2","s3","s4","s5"};
+char *private_server_grps[6]={"dummy","server1","server2","server3","server4","server5"};
 
 void propagate_append_update(server_variables *local_var,line_packet lp, LTS update_lts,char* room);
 line_packet process_append(server_variables *local_var,char *croom1, char* user, char* msg_data, LTS line_lts);
@@ -497,7 +497,14 @@ static  void    Read_message(int a, int b, void *local_var_arg)
 					sender, num_groups, mess_type );
 
 			int i;
+			
 			if(strcmp(sender,SERVER_GRP)==0){
+				int r;
+				for(r=1;r<6;r++){
+				
+					local_var->current_members[r]=0;
+				}
+				
 				for( i=0; i < num_groups; i++ ){
 
 					/*Extract ID from the group name*/
@@ -513,6 +520,15 @@ static  void    Read_message(int a, int b, void *local_var_arg)
 
 
 
+				}
+				int p;
+				for(p=1;p<6;p++){
+				
+					if(local_var->current_members[p]==0){
+					
+						//call reconcile partition.
+						reconcile_partition(local_var,p);
+					}
 				}
 			}
 			//printf("grp id is %d %d %d\n",memb_info.gid.id[0], memb_info.gid.id[1], memb_info.gid.id[2] );
@@ -535,13 +551,30 @@ static  void    Read_message(int a, int b, void *local_var_arg)
 			}else if( Is_caused_disconnect_mess( service_type ) ){
 				printf("Due to the DISCONNECT of %s\n", memb_info.changed_member );
 			}
-			else{
-
-				printf("Spread Network Error");
-				Bye();
+			else if( Is_caused_network_mess( service_type ) ){
+				printf("Due to NETWORK change with %u VS sets\n", memb_info.num_vs_sets);
+				num_vs_sets = SP_get_vs_sets_info( mess, &vssets[0], MAX_VSSETS, &my_vsset_index );
+				if (num_vs_sets < 0) {
+					printf("BUG: membership message has more then %d vs sets. Recompile with larger MAX_VSSETS\n", MAX_VSSETS);
+					SP_error( num_vs_sets );
+					exit( 1 );
+				}
+				for( i = 0; i < num_vs_sets; i++ )
+				{
+					printf("%s VS set %d has %u members:\n",
+							(i  == my_vsset_index) ?
+							("LOCAL") : ("OTHER"), i, vssets[i].num_members );
+					ret = SP_get_vs_set_members(mess, &vssets[i], members, MAX_MEMBERS);
+					if (ret < 0) {
+						printf("VS Set has more then %d members. Recompile with larger MAX_MEMBERS\n", MAX_MEMBERS);
+						SP_error( ret );
+						exit( 1 );
+					}
+					for( j = 0; j < vssets[i].num_members; j++ )
+						printf("\t%s\n", members[j] );
+				}
+				
 			}
-
-
 		}
 		else if( Is_transition_mess(   service_type ) ) {
 			printf("received TRANSITIONAL membership for group %s\n", sender );
@@ -656,6 +689,7 @@ void handle_user_mappings(server_variables *local_var, int new_server, char* gro
 	 * */
 	if(debug){
 		printf("\n -------Mapping for server id %d chatroom ---%s ---user %s-----flag %d-----\n",new_server,group, user, flag);
+		print_chatlist(local_var->server_chats[new_server]);
 		fflush(stdout);
 	}
 
@@ -726,7 +760,7 @@ void handle_user_mappings(server_variables *local_var, int new_server, char* gro
 
 			if(flag==1){
 				node* user_node=create_meta(user);
-				append(my_data3->users,user_seek);
+				append(my_data3->users,user_node);
 			}
 		}
 
@@ -958,7 +992,18 @@ line_packet process_append(server_variables *local_var,char *croom1, char* user,
 			croom	= (chatroom*)prev->next->data;
 		} 
 		linked_list* chat_list=croom->chatroom_msgs;
-		append(chat_list,new_line);
+		//append(chat_list,new_line);
+		int ret_val3;
+		node* loc=seek(chat_list, line_lts, &ret_val3);
+		if(ret_val3==1){
+
+			printf("\nLIne found, duplicating ???\n");
+
+		}
+		else{
+
+			insert(chat_list, new_line, loc);
+		}
 		print_line(chat_list);
 		//print_chatlist(local_var->chat_lists);
 		/*Now send the same msg back to all clients in group so that they can refresh screen*/

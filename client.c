@@ -10,10 +10,10 @@ LTS get_LTS(client_variables *local_var,int line_no_liked);
 void process_message(char* mess,client_variables *local_var);
 
 /*This will be joined by the client initially so that it can check if server is alive and get membership msgs*/
-char *public_server_grps[6]={"dummy","s1","s2","s3","s5","s6"};
+char *public_server_grps[6]={"dummy","s1","s2","s3","s4","s5"};
 
 /*Sent by client to server to send all other msgs*/
-char *private_server_grps[6]={"dummy","server1","server2","server3","server5","server6"};
+char *private_server_grps[6]={"dummy","server1","server2","server3","server4","server5"};
 
 /*Packet of specified type created for sending*/
 request_packet* create_packet(request type,char* data, LTS lts, client_variables* local_var);
@@ -656,8 +656,8 @@ static  void    Read_message(int a, int b, void *local_var_arg)
 			}
 			else{
 
-				printf("Spread Network Error");
-				Bye();
+				//printf("Spread Network Error");
+				//Bye();
 			}
 
 
@@ -821,7 +821,9 @@ void process_message(char* mess,client_variables *local_var){
 				insert(local_var->my_chatroom->chatroom_msgs, n1, prev);
 
 			}else{
-				append(local_var->my_chatroom->chatroom_msgs,n1);
+				
+			   	insert(local_var->my_chatroom->chatroom_msgs, n1, prev);		
+				//append(local_var->my_chatroom->chatroom_msgs,n1);
 				local_var->my_chatroom->counter++;
 				if(local_var->my_chatroom->counter ==LINES_ON_SCREEN){
 					printf("\nAlready reached lines on screen\n");
