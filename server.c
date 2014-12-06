@@ -185,8 +185,8 @@ void reconcile_merge(server_variables *local_var){
 
 				}
 				else if( local_var->recvd_vectors[k][j] > local_var->my_vector[j]){
-						flag=0;
-						break;	
+					flag=0;
+					break;	
 				}
 				else if( local_var->recvd_vectors[k][j] == local_var->my_vector[j]){
 
@@ -262,17 +262,17 @@ void reconcile_merge(server_variables *local_var){
 void reconcile_partition(server_variables *local_var, int server_id){
 
 	if(debug){
-	
+
 		printf("\nIn reconcile partition-----server_id : %d --------------\n",server_id);
 		fflush(stdout);
 	}
-	
+
 	/*Remove users from this server in my chatrooms*/
 	node* tmp=local_var->server_chats[server_id]->head;
 	while(tmp!=NULL){
-	
+
 		/*Loop through each chat room*/
-		
+
 		/*Get head till head == NULL (Delete each head)*/
 		chatroom* my_data=(chatroom*) tmp->data;
 
@@ -294,7 +294,7 @@ void reconcile_partition(server_variables *local_var, int server_id){
 
 
 	if(debug){
-	
+
 		printf("\nLEAVING reconcile partition-----server_id : %d --------------\n",server_id);
 		fflush(stdout);
 	}
@@ -495,25 +495,41 @@ static  void    Read_message(int a, int b, void *local_var_arg)
 		{
 			fprintf(log1,"Received REGULAR membership for group %s with %d members, where I am member %d:\n",
 					sender, num_groups, mess_type );
+
+			int i;
+			if(strcmp(sender,SERVER_GRP)==0){
+				for( i=0; i < num_groups; i++ ){
+
+					/*Extract ID from the group name*/
+					int id;
+					char* str=strtok( &target_groups[i][0],"#");
+					char* integer=strtok(str,"s");
+					id=atoi(integer);
+					local_var->current_members[id]=1;
+					if(debug){
+						printf("\nServer with id :%d in  group",id);
+						fflush(stdout);
+					}
+
+
+
+				}
+			}
+			//printf("grp id is %d %d %d\n",memb_info.gid.id[0], memb_info.gid.id[1], memb_info.gid.id[2] );
+
+
+
+
+
 			if( Is_caused_join_mess( service_type ) )
 			{
 				printf("\nDue to join of  %s\n",  memb_info.changed_member);
 				fprintf(log1,"Due to the JOIN of %s\n", memb_info.changed_member );
 				printf("\nGroup joined: %s",sender);
-				if(strcmp(sender,SERVER_GRP)==0){
 
-					/*Extract ID from the group name*/
-					int id;
-					char* str=strtok(memb_info.changed_member,"#");
-					char* integer=strtok(str,"s");
-					id=atoi(integer);
-					local_var->current_members[id]=1;
-					if(debug){
-						printf("\nServer with id :%d joined",id);
-						fflush(stdout);
-					}
 
-				}
+
+
 			}else if( Is_caused_leave_mess( service_type ) ){
 				printf("Due to the LEAVE of %s\n", memb_info.changed_member );
 			}else if( Is_caused_disconnect_mess( service_type ) ){
