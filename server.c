@@ -10,6 +10,7 @@
 #define MAXINT 2147483647
 
 
+void handle_user_mappings(server_variables *local_var, int new_server, char* group, char* user, int flag);
 void propagate_like_update( server_variables *local_var,request_packet* recv_packet, LTS update_lts, request);
 char *public_server_grps[6]={"dummy","s1","s2","s3","s5","s6"};
 char *private_server_grps[6]={"dummy","server1","server2","server3","server5","server6"};
@@ -19,7 +20,7 @@ line_packet process_append(server_variables *local_var,char *croom1, char* user,
 
 void send_packet(char *group_name, response_packet *packet, server_variables *local_var, int flag);
 void process_update(char* mess, server_variables *local_var);
-chatroom* process_join(char* group, server_variables *local_var,char *user);
+chatroom* process_join(char* group, server_variables *local_var,char *user, int server);
 void send_update(server_variables *local_var, update* to_send);
 void propagate_join_update(server_variables *local_var,request_packet* recv_packet, LTS update_lts,request);
 void process_client_update(request type, server_variables *local_var, char*, char* ,LTS);
@@ -421,7 +422,7 @@ void process_leave_chatroom(char* group, server_variables *local_var, char* user
 				user_check=user_check->next;
 
 			}
-			//increment count of user
+			//decrement count of user
 
 
 			((meta*)user_check->data)->cnt--;
@@ -434,8 +435,8 @@ void process_leave_chatroom(char* group, server_variables *local_var, char* user
 			}
 
 			if(debug){
-			printf("\n-------------PRINTING AFTER DELETING ------------------\n");
-		}
+				printf("\n-------------PRINTING AFTER DELETING ------------------\n");
+			}
 			print_meta(my_data3->users);
 
 
@@ -457,9 +458,104 @@ void process_leave_chatroom(char* group, server_variables *local_var, char* user
 
 }
 
+void handle_user_mappings(server_variables *local_var, int new_server, char* group, char* user, int flag){
 
 
-chatroom* process_join(char* group, server_variables *local_var, char* user){
+	/*If flag == 1 , we add a user - group mapping for a server. 
+	 * If flag == 0, we delete a user - group mapping for a server.
+	 * */
+	int ret_val;
+	node* prev, *prev_chatroom;
+	prev= seek_chatroom(local_var->server_chats[new_server],group,&ret_val);
+	prev_chatroom=prev;
+	node*temp;
+	/*Found chat room, if chatroom doesn't exist for this server, there's nothing to be done, in case of deleting a mapping*/
+	if(ret_val==1){
+
+		if(prev==NULL){
+
+			temp=local_var->server_chats[new_server]->head;
+		}
+		else{
+			temp=prev->next;
+		}
+
+		int ret_val2;
+		chatroom* my_data3=(chatroom*) temp->data;
+		node* prev_user;
+
+		/*Chatroom has been found, now seek for user-chatroom mapping for this server*/
+		node* user_seek= seek_user(my_data3->users,user,&ret_val2);
+		prev_user=user_seek;
+		if(ret_val2==1){
+
+			if(user_seek==NULL){
+
+				user_seek=my_data3->users->head;
+			}
+			else{
+				user_seek=user_seek->next;
+			}
+
+			/*Operation of adding user-group mapping*/
+			if(flag==1){
+				((meta*)user_seek->data)->cnt++;
+			}
+			else{ /*Delete user group mapping*/
+
+				/*Decrement user count*/
+				((meta*)user_seek->data)->cnt--;
+
+				/*Check if user count has reached zero, if so, delete  user node from that chat room list
+				 * If linked list becomes empty
+				 * Delete that chat room*/
+				if( (((meta*)user_seek->data)->cnt) == 0){
+
+					delete(my_data3->users,prev_user);
+					
+					if(is_empty(my_data3->users )){
+						
+						/*Delete that chatroom list*/
+						delete(local_var->server_chats[new_server],prev_chatroom);			
+					
+					}
+
+
+
+				}
+
+
+			}
+		}
+		else{
+
+			if(flag==1){
+				node* user_node=create_meta(user);
+				append(my_data3->users,user_seek);
+			}
+		}
+
+	}
+	else{
+
+
+		if(flag==1){
+			node* newly_created_room=(node*)create_chatroom(group);
+				append(local_var->server_chats[new_server],newly_created_room);
+
+				// add user to newly created room
+			/*This chatroom WILL NOT have msgs*/
+				chatroom* new_room = (chatroom*)newly_created_room->data;
+			node* new_user1= create_meta(user);
+			append(new_room->users,new_user1);
+		}
+	}
+
+
+
+}
+
+chatroom* process_join(char* group, server_variables *local_var, char* user, int new_server){
 
 	/*First check if this chatroom exists in the list
 	 * i.e seek the list for the location of the chatroom
@@ -469,6 +565,10 @@ chatroom* process_join(char* group, server_variables *local_var, char* user){
 	int ret_val;
 	node *prev, *temp, *user_check;
 	chatroom *my_data3;
+
+	/*Handle mappings - useful on partitions*/
+	//handle_user_mappings(local_var, new_server, group, user);
+
 	prev= seek_chatroom(local_var->chat_lists,group,&ret_val);
 
 	//chatroom found
@@ -574,45 +674,45 @@ void process_update(char* mess, server_variables *local_var){
 		switch(update_packet->update_type){
 
 			case JOIN: 
-				   if(debug){
-				   	printf("\n-------------Got a MESSAge to join %s---------------",update_packet->update_chat_room);
+				if(debug){
+					printf("\n-------------Got a MESSAge to join %s---------------",update_packet->update_chat_room);
 
-				   }
-				   process_join(update_packet->update_chat_room,local_var,update_packet->update_data.data_join.join_packet_user);
-				   response_packet *join_p= create_response_packet(R_JOIN,local_var);
-				   sprintf(join_p->data.users[0],"%s",update_packet->update_data.data_join.join_packet_user);			
-				   
-				   if(debug){
-				   	printf("\n-------------Got a MESSAge to join %s---------------",update_packet->update_chat_room);
+				}
+				process_join(update_packet->update_chat_room,local_var,update_packet->update_data.data_join.join_packet_user);
+				response_packet *join_p= create_response_packet(R_JOIN,local_var);
+				sprintf(join_p->data.users[0],"%s",update_packet->update_data.data_join.join_packet_user);			
 
-				   }
-				   send_packet(update_packet->update_chat_room,join_p,local_var,0);
+				if(debug){
+					printf("\n-------------Got a MESSAge to join %s---------------",update_packet->update_chat_room);
 
-				   break;
+				}
+				send_packet(update_packet->update_chat_room,join_p,local_var,0);
+
+				break;
 			case LIKE:
 
-				   process_client_update(update_packet->update_type,local_var,update_packet->update_data.data_like.like_packet_user, update_packet->update_chat_room, update_packet->update_data.data_like.like_packet_line_no_lts);
-				   break;
+				process_client_update(update_packet->update_type,local_var,update_packet->update_data.data_like.like_packet_user, update_packet->update_chat_room, update_packet->update_data.data_like.like_packet_line_no_lts);
+				break;
 			case MSG:
-				   if(debug){
-					   printf("\n In update, chatroom: %s",update_packet->update_chat_room);
-				   }
-				   process_append(local_var, update_packet->update_chat_room, update_packet->update_data.data_line.line_packet_user,update_packet->update_data.data_line.line_packet_message,update_packet->update_data.data_line.line_packet_lts );
+				if(debug){
+					printf("\n In update, chatroom: %s",update_packet->update_chat_room);
+				}
+				process_append(local_var, update_packet->update_chat_room, update_packet->update_data.data_line.line_packet_user,update_packet->update_data.data_line.line_packet_message,update_packet->update_data.data_line.line_packet_lts );
 
-				   break;
+				break;
 			case UNLIKE:
 
-				   process_client_update(update_packet->update_type,local_var,update_packet->update_data.data_like.like_packet_user, update_packet->update_chat_room, update_packet->update_data.data_like.like_packet_line_no_lts);
-				   break;
+				process_client_update(update_packet->update_type,local_var,update_packet->update_data.data_like.like_packet_user, update_packet->update_chat_room, update_packet->update_data.data_like.like_packet_line_no_lts);
+				break;
 			case LEAVE:
-				   process_leave_chatroom(update_packet->update_chat_room,local_var,update_packet->update_data.data_join.join_packet_user);
-				   response_packet *join_p1= create_response_packet(R_LEAVE,local_var);
-				   sprintf(join_p1->data.users[0],"%s",update_packet->update_data.data_join.join_packet_user);			
-				   send_packet(update_packet->update_chat_room,join_p1,local_var,0);
+				process_leave_chatroom(update_packet->update_chat_room,local_var,update_packet->update_data.data_join.join_packet_user);
+				response_packet *join_p1= create_response_packet(R_LEAVE,local_var);
+				sprintf(join_p1->data.users[0],"%s",update_packet->update_data.data_join.join_packet_user);			
+				send_packet(update_packet->update_chat_room,join_p1,local_var,0);
 
 
 
-				   break;
+				break;
 		}
 	}
 }
@@ -828,7 +928,7 @@ void process_message(char* mess,char* sender, server_variables *local_var){
 			   char group1[SIZE]="\0";
 			   sscanf(recv_packet->request_packet_chatroom,"%s",group1);
 			   if(debug){
-			   	printf("\n----------------_CHAT ROOM: %s--------------------",group1);
+				   printf("\n----------------_CHAT ROOM: %s--------------------",group1);
 			   }
 			   local_var->my_lts.LTS_counter++;
 			   process_leave_chatroom(group1,local_var,recv_packet->request_packet_user);
@@ -870,7 +970,7 @@ void propagate_join_update(server_variables *local_var,request_packet* recv_pack
 	update* to_send=(update*)new_update->data;
 	if(debug){
 		printf("\n---------Printing propogate join message--------\n  %s \n", recv_packet->request_packet_chatroom);
-		
+
 	}
 	send_update(local_var,to_send);
 
