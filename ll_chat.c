@@ -478,8 +478,10 @@ void print_chatlist(linked_list *chat_ll){
 
 		chatroom* my_data2=(chatroom*)temp->data;
 		if(debug){
-			printf("\nPrinting node's data\n");
+			printf("\n------------Chatroom name--------------\n");
 			printf("\nroom: %s",my_data2->chatroom_name);
+			
+			print_meta(my_data2->users);
 			fflush(stdout);
 		}
 		temp=temp->next;

@@ -10,6 +10,8 @@
 #define MAXINT 2147483647
 
 
+void process_leave_chatroom(char* group, server_variables *local_var, char* user, int new_server);
+void reconcile_partition(server_variables *local_var, int server_id);
 void handle_user_mappings(server_variables *local_var, int new_server, char* group, char* user, int flag);
 void propagate_like_update( server_variables *local_var,request_packet* recv_packet, LTS update_lts, request);
 char *public_server_grps[6]={"dummy","s1","s2","s3","s5","s6"};
@@ -57,6 +59,9 @@ static void Usage();
 
 /*Function that reads messages and processes them*/
 static  void    Read_message(int,int, void*);
+
+
+void reconcile_merge(server_variables *local_var);
 
 
 
@@ -111,15 +116,27 @@ int main(int argc, char* argv[]){
 	LTS init;
 	init.LTS_counter=-1;
 	init.LTS_server_id=-1;
-	local_var.my_vector[0]=init;
+	local_var.my_vector[0]=-1;
 	while(k<6){
 
-		local_var.my_vector[k]=init;
+		local_var.my_vector[k]=-1;
 		local_var.server_chats[k]=(linked_list*)get_linked_list(LIST_CHATROOM);
+
 		k++;
 	}
+
+
+	int p=1,r=1;
+	for(r=1;r<6;r++){
+
+		for(p=1;p<6;p++){
+			local_var.recvd_vectors[r][p]=-1;
+		}
+	}
+
+
 	/*Here you will load old DATA of chatrooms into the chatlists structure*/
-	//TODO
+	//TODO - Make sure you need data structures from files
 	connect_to_spread(&local_var);
 	/*Initialize Spread event handling system*/
 	E_init();
@@ -138,8 +155,151 @@ int main(int argc, char* argv[]){
 
 
 
+void reconcile_merge(server_variables *local_var){
 
 
+	int i=0,j,k;
+	int min;
+	int flag=1;
+	/*current_members[i]==1 ONLY if i is present in the current partition ELSE 0
+	 *
+	 * j : Index of member NOT in partition (column in matrix )
+	 * k : Index of member IN parition, row matrix 
+	 * */
+	for(j=1;j<6;j++){
+
+		if(local_var->current_members[j]!=1){
+
+			/*Doing processing for server number j*/
+
+			for(k=1;k<6;k++){
+				if(k==local_var->machine_id || local_var->current_members[k]!=1){
+					continue;
+				}
+
+
+				if(local_var->recvd_vectors[j][k] < min){
+
+					min=local_var->recvd_vectors[k][j];
+
+
+				}
+				else if( local_var->recvd_vectors[k][j] > local_var->my_vector[j]){
+						flag=0;
+						break;	
+				}
+				else if( local_var->recvd_vectors[k][j] == local_var->my_vector[j]){
+
+					/*Check to see if I am lower server ID*/
+
+					if(local_var->machine_id > k){
+						flag=0;
+						break;
+					}
+
+
+				}
+
+
+
+			}
+
+			if(flag==1){
+				LTS start,stop;
+				start.LTS_counter=min;
+				start.LTS_server_id=j;
+
+				stop.LTS_counter=local_var->recvd_vectors[local_var->machine_id][j];
+				stop.LTS_server_id=j;
+
+				int ret_val;
+				node* temp=seek(local_var->update_list, start,&ret_val);
+				if(ret_val==1){
+
+					if(temp==NULL){
+
+
+						temp=local_var->update_list->head->next;
+					}
+					else{
+
+						temp=temp->next->next;
+					}
+
+					while(temp!=NULL){
+
+
+						update* my_update = (update*)temp->data;
+						if(my_update->update_lts.LTS_counter>stop.LTS_counter){
+
+							break;
+						}
+						if(my_update->update_lts.LTS_server_id==j){
+
+							/*This is an update in chronological order after min*/
+							/*Create an update and send it */
+							send_update(local_var,my_update);
+
+
+						}
+
+					}
+
+				}
+
+			}
+		}
+
+
+
+	}
+
+
+}
+
+
+
+void reconcile_partition(server_variables *local_var, int server_id){
+
+	if(debug){
+	
+		printf("\nIn reconcile partition-----server_id : %d --------------\n",server_id);
+		fflush(stdout);
+	}
+	
+	/*Remove users from this server in my chatrooms*/
+	node* tmp=local_var->server_chats[server_id]->head;
+	while(tmp!=NULL){
+	
+		/*Loop through each chat room*/
+		
+		/*Get head till head == NULL (Delete each head)*/
+		chatroom* my_data=(chatroom*) tmp->data;
+
+		node* m= my_data->users->head;
+		while(m!=NULL){
+
+			meta* u= (meta*)m->data;
+
+			response_packet *join_p1= create_response_packet(R_LEAVE,local_var);
+			sprintf(join_p1->data.users[0],"%s",u->meta_user);			
+			process_leave_chatroom(my_data->chatroom_name, local_var, u->meta_user, server_id );
+			send_packet(my_data->chatroom_name,join_p1,local_var,0);
+
+
+			m=my_data->users->head;
+		}
+		tmp=tmp->next;
+	}
+
+
+	if(debug){
+	
+		printf("\nLEAVING reconcile partition-----server_id : %d --------------\n",server_id);
+		fflush(stdout);
+	}
+
+}
 
 void connect_to_spread(server_variables *local_var){
 
@@ -247,6 +407,7 @@ static void Usage(){
 	printf("\nUsage: <server_id>\n");
 	exit(1);
 }
+
 
 
 static  void    Read_message(int a, int b, void *local_var_arg)
@@ -387,13 +548,20 @@ static  void    Read_message(int a, int b, void *local_var_arg)
 
 }
 
-void process_leave_chatroom(char* group, server_variables *local_var, char* user){
+void process_leave_chatroom(char* group, server_variables *local_var, char* user, int new_server){
+
+
+	if(debug){
+
+		printf("\n----------_Entering process leave chatroom with GROUP : %s USER :%s server :%d\n", group, user, new_server);
+		fflush(stdout);
+	}
 
 	int ret_val;
 	node *prev, *temp, *user_check;
 	chatroom *my_data3;
 	prev= seek_chatroom(local_var->chat_lists,group,&ret_val);
-
+	handle_user_mappings(local_var,new_server,group,user, 0);	
 	if(ret_val==1){
 
 
@@ -455,6 +623,12 @@ void process_leave_chatroom(char* group, server_variables *local_var, char* user
 	}
 
 
+	if(debug){
+
+		printf("\n----------LEAVING  process leave chatroom with GROUP : %s USER :%s server :%d\n", group, user, new_server);
+		fflush(stdout);
+	}
+
 
 }
 
@@ -464,6 +638,11 @@ void handle_user_mappings(server_variables *local_var, int new_server, char* gro
 	/*If flag == 1 , we add a user - group mapping for a server. 
 	 * If flag == 0, we delete a user - group mapping for a server.
 	 * */
+	if(debug){
+		printf("\n -------Mapping for server id %d chatroom ---%s ---user %s-----flag %d-----\n",new_server,group, user, flag);
+		fflush(stdout);
+	}
+
 	int ret_val;
 	node* prev, *prev_chatroom;
 	prev= seek_chatroom(local_var->server_chats[new_server],group,&ret_val);
@@ -512,12 +691,12 @@ void handle_user_mappings(server_variables *local_var, int new_server, char* gro
 				if( (((meta*)user_seek->data)->cnt) == 0){
 
 					delete(my_data3->users,prev_user);
-					
+
 					if(is_empty(my_data3->users )){
-						
+
 						/*Delete that chatroom list*/
 						delete(local_var->server_chats[new_server],prev_chatroom);			
-					
+
 					}
 
 
@@ -541,17 +720,25 @@ void handle_user_mappings(server_variables *local_var, int new_server, char* gro
 
 		if(flag==1){
 			node* newly_created_room=(node*)create_chatroom(group);
-				append(local_var->server_chats[new_server],newly_created_room);
+			append(local_var->server_chats[new_server],newly_created_room);
 
-				// add user to newly created room
+			// add user to newly created room
 			/*This chatroom WILL NOT have msgs*/
-				chatroom* new_room = (chatroom*)newly_created_room->data;
+			chatroom* new_room = (chatroom*)newly_created_room->data;
 			node* new_user1= create_meta(user);
 			append(new_room->users,new_user1);
+
 		}
 	}
 
+	print_chatlist(local_var->server_chats[new_server]);
 
+
+	if(debug){
+		printf("\n -------LEAVING Mapping for server id %d chatroom ---%s ---user %s-----flag %d-----\n",new_server,group, user, flag);
+
+		fflush(stdout);
+	}
 
 }
 
@@ -566,8 +753,13 @@ chatroom* process_join(char* group, server_variables *local_var, char* user, int
 	node *prev, *temp, *user_check;
 	chatroom *my_data3;
 
+	if(debug){
+		fprintf(log1,"\n entering process_join with chatroom name %s ...user name %s...and server id %d.\n",group, user, new_server);
+		fflush(log1);
+	}
+
 	/*Handle mappings - useful on partitions*/
-	//handle_user_mappings(local_var, new_server, group, user);
+	handle_user_mappings(local_var, new_server, group, user,1);
 
 	prev= seek_chatroom(local_var->chat_lists,group,&ret_val);
 
@@ -645,6 +837,10 @@ chatroom* process_join(char* group, server_variables *local_var, char* user, int
 
 	}
 
+	if(debug){
+		fprintf(log1,"\n exiting process_join with chatroom name %s ...user name %s...and returning a chat room name %s.\n",group, user, my_data3->chatroom_name);
+		fflush(log1);
+	}
 
 	return my_data3;
 }
@@ -678,7 +874,7 @@ void process_update(char* mess, server_variables *local_var){
 					printf("\n-------------Got a MESSAge to join %s---------------",update_packet->update_chat_room);
 
 				}
-				process_join(update_packet->update_chat_room,local_var,update_packet->update_data.data_join.join_packet_user);
+				process_join(update_packet->update_chat_room,local_var,update_packet->update_data.data_join.join_packet_user,update_packet->update_lts.LTS_server_id);
 				response_packet *join_p= create_response_packet(R_JOIN,local_var);
 				sprintf(join_p->data.users[0],"%s",update_packet->update_data.data_join.join_packet_user);			
 
@@ -705,7 +901,7 @@ void process_update(char* mess, server_variables *local_var){
 				process_client_update(update_packet->update_type,local_var,update_packet->update_data.data_like.like_packet_user, update_packet->update_chat_room, update_packet->update_data.data_like.like_packet_line_no_lts);
 				break;
 			case LEAVE:
-				process_leave_chatroom(update_packet->update_chat_room,local_var,update_packet->update_data.data_join.join_packet_user);
+				process_leave_chatroom(update_packet->update_chat_room,local_var,update_packet->update_data.data_join.join_packet_user,update_packet->update_lts.LTS_server_id);
 				response_packet *join_p1= create_response_packet(R_LEAVE,local_var);
 				sprintf(join_p1->data.users[0],"%s",update_packet->update_data.data_join.join_packet_user);			
 				send_packet(update_packet->update_chat_room,join_p1,local_var,0);
@@ -809,7 +1005,7 @@ void process_message(char* mess,char* sender, server_variables *local_var){
 
 			   response_packet *response1=create_response_packet(R_ACK,local_var);
 
-			   my_data3=process_join(group,local_var,recv_packet->request_packet_user);
+			   my_data3=process_join(group,local_var,recv_packet->request_packet_user,local_var->machine_id);
 
 			   /*Create a list of users and send*/
 			   node* current_user=my_data3->users->head;
@@ -931,7 +1127,7 @@ void process_message(char* mess,char* sender, server_variables *local_var){
 				   printf("\n----------------_CHAT ROOM: %s--------------------",group1);
 			   }
 			   local_var->my_lts.LTS_counter++;
-			   process_leave_chatroom(group1,local_var,recv_packet->request_packet_user);
+			   process_leave_chatroom(group1,local_var,recv_packet->request_packet_user,local_var->machine_id);
 			   response_packet *leave_p= create_response_packet(R_LEAVE,local_var);
 			   sprintf(leave_p->data.users[0],"%s",recv_packet->request_packet_user);
 			   send_packet(recv_packet->request_packet_chatroom,leave_p,local_var,0);
