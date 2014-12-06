@@ -832,8 +832,16 @@ void process_message(char* mess,client_variables *local_var){
 
 				}else if(local_var->my_chatroom->counter>LINES_ON_SCREEN){
 
+					 line * l_a = (line*) local_var->my_chatroom->start->data;
+					 LTS of_start = l_a->line_content.line_packet_lts;
+
+					 if( (new_response->data.line.line_packet_lts.LTS_counter > of_start.LTS_counter) || ( (new_response->data.line.line_packet_lts.LTS_counter == of_start.LTS_counter) && (new_response->data.line.line_packet_lts.LTS_server_id > of_start.LTS_server_id  )  )){
+
+					
+
 					printf("\nAlready reached MORE lines on screen\n");
 					local_var->my_chatroom->start=local_var->my_chatroom->start->next;
+					 }
 
 				}
 			}

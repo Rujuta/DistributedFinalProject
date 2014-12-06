@@ -38,19 +38,19 @@
 //#include "linked_list.h"
 /*Different types of user requests user makes*/
 typedef enum request{
-	MSG, LIKE, UNLIKE, JOIN, LEAVE, HISTORY, VIEW,CONNECT, DISCONNECT
+	MSG, LIKE, UNLIKE, JOIN, LEAVE, HISTORY, VIEW,CONNECT, DISCONNECT, MERGE
 }request;
 
 typedef enum response{
-	R_ACK=10, R_MSG, R_HISTORY, R_VIEW, R_JOIN, R_LEAVE
+	R_ACK=15, R_MSG, R_HISTORY, R_VIEW, R_JOIN, R_LEAVE
 }response;
 
 typedef enum list_type{
-	LIST_UPDATE=20, LIST_LINE, LIST_META ,LIST_CHATROOM
+	LIST_UPDATE=25, LIST_LINE, LIST_META ,LIST_CHATROOM
 }list_type;
 
 typedef enum client_states{
-	NOT_CONNECTED=30, LOGGED_IN, IN_CHATROOM, LOG_CONN,CONNECTED 
+	NOT_CONNECTED=35, LOGGED_IN, IN_CHATROOM, LOG_CONN,CONNECTED 
 }client_states;
 
 
@@ -72,6 +72,16 @@ typedef struct LTS{
 	int LTS_server_id;
 
 }LTS;
+
+
+typedef struct merge_packet{
+
+	        int vector[6];
+		        int source_id;
+			        int memb_id;
+}merge_packet;
+
+
 
 /*Update structure for like/unlike a line number*/
 typedef struct like_packet{
@@ -105,6 +115,7 @@ typedef union union_update_data{
 	struct line_packet data_line;
 	struct like_packet data_like;
 	struct join_packet data_join;
+	struct merge_packet data_merge;
 
 }union_update_data;
 
@@ -181,6 +192,11 @@ typedef struct my_variables_server{
 	int current_members[6];
 	linked_list* server_chats[6];
 	int total_members;
+	int vectors_cnt;
+	int current_memb_id;
+
+
+ 	
 }server_variables;
 
 
@@ -207,6 +223,7 @@ typedef struct response_packet{
 	response_data data;
 
 }response_packet;
+
 
 
 node* get_node(list_type);

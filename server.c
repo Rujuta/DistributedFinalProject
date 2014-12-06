@@ -10,6 +10,8 @@
 #define MAXINT 2147483647
 
 
+void send_my_updates(server_variables *local_var, int min);
+void create_merge_packet(server_variables *local_var);
 void process_leave_chatroom(char* group, server_variables *local_var, char* user, int new_server);
 void reconcile_partition(server_variables *local_var, int server_id);
 void handle_user_mappings(server_variables *local_var, int new_server, char* group, char* user, int flag);
@@ -153,7 +155,58 @@ int main(int argc, char* argv[]){
 	//display_prompt();
 }
 
+void send_my_updates(server_variables *local_var, int min){
 
+
+	if(debug){
+
+		printf("\n Entering SEND_my_updates with min :%d\n",min);
+		fflush(stdout);
+	}
+	LTS start,stop;
+	start.LTS_counter=min;
+	start.LTS_server_id=local_var->machine_id;
+
+
+	int ret_val;
+	node* temp=seek(local_var->update_list, start,&ret_val);
+	if(ret_val==1){
+
+		if(temp==NULL){
+
+
+			temp=local_var->update_list->head->next;
+		}
+		else{
+
+			temp=temp->next->next;
+		}
+
+		while(temp!=NULL){
+
+
+			update* my_update = (update*)temp->data;
+
+			if(my_update->update_lts.LTS_server_id==local_var->machine_id){
+
+				/*This is an update in chronological order after min*/
+				/*Create an update and send it */
+
+				if(debug){
+					printf("\nSending update FROM SEND_MY_UPDATE  with LTS : %d server : %d\n",my_update->update_lts.LTS_counter,my_update->update_lts.LTS_server_id);
+					fflush(stdout);
+				}
+				send_update(local_var,my_update);
+
+
+			}
+			temp= temp->next;
+		}
+
+
+
+	}
+}
 
 void reconcile_merge(server_variables *local_var){
 
@@ -161,12 +214,49 @@ void reconcile_merge(server_variables *local_var){
 	int i=0,j,k;
 	int min;
 	int flag=1;
+	if(debug){
+
+		printf("\nEntering reconcile_merge: \n");
+
+		printf("\nmy lts counter for min is %d\n", local_var->my_lts.LTS_counter);
+		fflush(stdout);
+	}
+
+
+	/*First I send ALL my updates that no one in parition has*/
+	/*Check to find min recvd from me*/
+	int l, my_min=local_var->my_lts.LTS_counter;
+
+
+	for(l=1;l<6;l++){
+
+
+		if(l == local_var->machine_id)
+			continue;
+		if(local_var->current_members[l]==1){
+
+			if(my_min>local_var->recvd_vectors[l][local_var->machine_id]){
+				my_min=local_var->recvd_vectors[l][local_var->machine_id];
+
+				printf("\nrecvd vector for server  %d is: %d\n", l,local_var->recvd_vectors[l][local_var->machine_id]);
+			}
+		}
+
+	}
+
+
+	/*Now send ALL my updates starting from my_min uptill NOW*/
+
+	send_my_updates(local_var,my_min);
+
 	/*current_members[i]==1 ONLY if i is present in the current partition ELSE 0
 	 *
 	 * j : Index of member NOT in partition (column in matrix )
 	 * k : Index of member IN parition, row matrix 
 	 * */
 	for(j=1;j<6;j++){
+		flag = 1;
+		min = local_var->my_vector[j];
 
 		if(local_var->current_members[j]!=1){
 
@@ -209,14 +299,23 @@ void reconcile_merge(server_variables *local_var){
 				start.LTS_counter=min;
 				start.LTS_server_id=j;
 
-				stop.LTS_counter=local_var->recvd_vectors[local_var->machine_id][j];
+				stop.LTS_counter=local_var->my_vector[j];
 				stop.LTS_server_id=j;
 
+				if(debug){
+					printf("\n....going to send other peoples updates with min = %d for server %d......\n", min, j);
+					fflush(stdout);
+
+				}
 				int ret_val;
 				node* temp=seek(local_var->update_list, start,&ret_val);
 				if(ret_val==1){
 
-					if(temp==NULL){
+					if(temp==NULL){	
+						if(debug){
+							printf("\n....in recon merge temp == null for seek\n");
+							fflush(stdout);
+						}
 
 
 						temp=local_var->update_list->head->next;
@@ -232,17 +331,33 @@ void reconcile_merge(server_variables *local_var){
 						update* my_update = (update*)temp->data;
 						if(my_update->update_lts.LTS_counter>stop.LTS_counter){
 
+							if(debug){
+								printf("\n....found lts greater then stop...\n");
+								fflush(stdout);
+							}
+
+
 							break;
 						}
 						if(my_update->update_lts.LTS_server_id==j){
 
 							/*This is an update in chronological order after min*/
 							/*Create an update and send it */
+
+							if(debug){
+								printf("\nSending update with LTS : %d server : %d\n",my_update->update_lts.LTS_counter,my_update->update_lts.LTS_server_id);
+								fflush(stdout);
+							}
 							send_update(local_var,my_update);
 
-
 						}
+						temp=temp->next;
+					}
 
+				}else{
+					if(debug){
+						printf("\n....in or for ret val in sending other ppls stuff...\n");
+						fflush(stdout);
 					}
 
 				}
@@ -255,6 +370,11 @@ void reconcile_merge(server_variables *local_var){
 	}
 
 
+	if(debug){
+
+		printf("\nLeaving reconcile_merge: \n");
+		fflush(stdout);
+	}
 }
 
 
@@ -497,14 +617,20 @@ static  void    Read_message(int a, int b, void *local_var_arg)
 					sender, num_groups, mess_type );
 
 			int i;
-			
+
 			if(strcmp(sender,SERVER_GRP)==0){
 				int r;
 				for(r=1;r<6;r++){
-				
+
 					local_var->current_members[r]=0;
 				}
-				
+
+				local_var->total_members=num_groups;
+				if(debug){
+
+					printf("\nNumber of servers: %d\n",num_groups);
+					fflush(stdout);
+				}
 				for( i=0; i < num_groups; i++ ){
 
 					/*Extract ID from the group name*/
@@ -513,6 +639,7 @@ static  void    Read_message(int a, int b, void *local_var_arg)
 					char* integer=strtok(str,"s");
 					id=atoi(integer);
 					local_var->current_members[id]=1;
+
 					if(debug){
 						printf("\nServer with id :%d in  group",id);
 						fflush(stdout);
@@ -521,15 +648,8 @@ static  void    Read_message(int a, int b, void *local_var_arg)
 
 
 				}
-				int p;
-				for(p=1;p<6;p++){
-				
-					if(local_var->current_members[p]==0){
-					
-						//call reconcile partition.
-						reconcile_partition(local_var,p);
-					}
-				}
+
+
 			}
 			//printf("grp id is %d %d %d\n",memb_info.gid.id[0], memb_info.gid.id[1], memb_info.gid.id[2] );
 
@@ -550,6 +670,19 @@ static  void    Read_message(int a, int b, void *local_var_arg)
 				printf("Due to the LEAVE of %s\n", memb_info.changed_member );
 			}else if( Is_caused_disconnect_mess( service_type ) ){
 				printf("Due to the DISCONNECT of %s\n", memb_info.changed_member );
+
+				if(strcmp(sender,SERVER_GRP)==0){
+					int p;
+					for(p=1;p<6;p++){
+
+						if(local_var->current_members[p]==0){
+
+							//call reconcile partition.
+							reconcile_partition(local_var,p);
+						}
+					}
+				}
+
 			}
 			else if( Is_caused_network_mess( service_type ) ){
 				printf("Due to NETWORK change with %u VS sets\n", memb_info.num_vs_sets);
@@ -558,6 +691,49 @@ static  void    Read_message(int a, int b, void *local_var_arg)
 					printf("BUG: membership message has more then %d vs sets. Recompile with larger MAX_VSSETS\n", MAX_VSSETS);
 					SP_error( num_vs_sets );
 					exit( 1 );
+				}
+
+
+				if(strcmp(sender,SERVER_GRP)==0){
+
+					if(num_vs_sets==1){
+
+
+						printf("\n\n*****__________Calling RECONCILE PARTITION_______****\n\n");
+						/*If num_vs_sets == 1 it is a LEAVE or partition creation*/
+						int p;
+						for(p=1;p<6;p++){
+
+							if(local_var->current_members[p]==0){
+
+								//call reconcile partition.
+								reconcile_partition(local_var,p);
+							}
+
+						}
+					}
+					else{
+
+						//init counter that keeps track of no of local vectors received
+						local_var->vectors_cnt=1;
+
+
+						//TODO set member ship ID here. 
+
+						/*Reinit received vectors matrix*/
+						int k,w;
+						for(k=0;k<6;k++){
+
+							for(w=0;w<6;w++)
+								local_var->recvd_vectors[k][w]=0;
+						}	
+
+
+
+						//send my local vector to everyone in group
+						create_merge_packet(local_var);
+
+					}
 				}
 				for( i = 0; i < num_vs_sets; i++ )
 				{
@@ -573,7 +749,7 @@ static  void    Read_message(int a, int b, void *local_var_arg)
 					for( j = 0; j < vssets[i].num_members; j++ )
 						printf("\t%s\n", members[j] );
 				}
-				
+
 			}
 		}
 		else if( Is_transition_mess(   service_type ) ) {
@@ -596,6 +772,59 @@ static  void    Read_message(int a, int b, void *local_var_arg)
 
 
 }
+
+
+void create_merge_packet(server_variables *local_var){
+
+
+
+	if(debug){
+
+		printf("\n  BEFORE sending MERGE: sent values : machine id %d memb id: %d    ",local_var->machine_id, local_var->current_memb_id);
+		printf("\n Printing vector sent:\n");
+		int i;
+		for(i=0;i<6;i++){
+
+			printf(" %d\t",local_var->my_vector[i]);
+		}
+		fflush(stdout);
+
+	}
+
+	LTS lts;
+	lts.LTS_counter=-1;
+	lts.LTS_server_id=-1;
+	char chat[SIZE]="\0";
+	int i;
+	//sprintf()
+	merge_packet mp;
+	mp.source_id=local_var->machine_id;
+	mp.memb_id=local_var->current_memb_id;
+	for(i=0;i<6;i++){
+
+		mp.vector[i]=local_var->my_vector[i];	
+	}
+	union_update_data merge_data;
+	memcpy(&merge_data,&mp,sizeof(mp));
+	node* u_merge=create_update(MERGE,lts,chat,merge_data );
+
+	update *to_send=(update*)u_merge->data;
+
+	send_update(local_var,to_send);
+
+	if(debug){
+
+		printf("\n  After sending MERGE: sent values : machine id %d memb id: %d    ",mp.source_id, mp.memb_id);
+		printf("\n Printing vector sent:\n");
+		for(i=0;i<6;i++){
+
+			printf(" %d\t",mp.vector[i]);
+		}
+		fflush(stdout);
+	}
+
+}
+
 
 void process_leave_chatroom(char* group, server_variables *local_var, char* user, int new_server){
 
@@ -680,6 +909,8 @@ void process_leave_chatroom(char* group, server_variables *local_var, char* user
 
 
 }
+
+
 
 void handle_user_mappings(server_variables *local_var, int new_server, char* group, char* user, int flag){
 
@@ -902,64 +1133,117 @@ void process_update(char* mess, server_variables *local_var){
 	node *temp, *prev;
 
 	node* new_update=create_update(update_packet->update_type, update_packet->update_lts, update_packet->update_chat_room,update_packet->update_data);
-	/*Do causality check*/
-	//int flag= check_causality(local_var,update_packet->update_lts);
-	int flag=1;
 
-	if(flag==0){
-		/*Causally dependent*/
+	if(update_packet->update_type!=MERGE){
+		/*Do causality check*/
+		//int flag= check_causality(local_var,update_packet->update_lts);
+		int flag=1;
 
-		append(local_var->undelivered_update_list,new_update);
-	}
-	else{
+		if(flag==0){
+			/*Causally dependent*/
 
-		append(local_var->update_list,new_update);
-
-		/*Adapt to new LTS counter*/
-		local_var->my_lts.LTS_counter=update_packet->update_lts.LTS_counter;
-		switch(update_packet->update_type){
-
-			case JOIN: 
-				if(debug){
-					printf("\n-------------Got a MESSAge to join %s---------------",update_packet->update_chat_room);
-
-				}
-				process_join(update_packet->update_chat_room,local_var,update_packet->update_data.data_join.join_packet_user,update_packet->update_lts.LTS_server_id);
-				response_packet *join_p= create_response_packet(R_JOIN,local_var);
-				sprintf(join_p->data.users[0],"%s",update_packet->update_data.data_join.join_packet_user);			
-
-				if(debug){
-					printf("\n-------------Got a MESSAge to join %s---------------",update_packet->update_chat_room);
-
-				}
-				send_packet(update_packet->update_chat_room,join_p,local_var,0);
-
-				break;
-			case LIKE:
-
-				process_client_update(update_packet->update_type,local_var,update_packet->update_data.data_like.like_packet_user, update_packet->update_chat_room, update_packet->update_data.data_like.like_packet_line_no_lts);
-				break;
-			case MSG:
-				if(debug){
-					printf("\n In update, chatroom: %s",update_packet->update_chat_room);
-				}
-				process_append(local_var, update_packet->update_chat_room, update_packet->update_data.data_line.line_packet_user,update_packet->update_data.data_line.line_packet_message,update_packet->update_data.data_line.line_packet_lts );
-
-				break;
-			case UNLIKE:
-
-				process_client_update(update_packet->update_type,local_var,update_packet->update_data.data_like.like_packet_user, update_packet->update_chat_room, update_packet->update_data.data_like.like_packet_line_no_lts);
-				break;
-			case LEAVE:
-				process_leave_chatroom(update_packet->update_chat_room,local_var,update_packet->update_data.data_join.join_packet_user,update_packet->update_lts.LTS_server_id);
-				response_packet *join_p1= create_response_packet(R_LEAVE,local_var);
-				sprintf(join_p1->data.users[0],"%s",update_packet->update_data.data_join.join_packet_user);			
-				send_packet(update_packet->update_chat_room,join_p1,local_var,0);
-
-
-
-				break;
+			//append(local_var->undelivered_update_list,new_update);
 		}
+		else{
+			int r;
+			node* old=seek(local_var->update_list, update_packet->update_lts,&r);
+			insert(local_var->update_list,new_update,old);
+
+			/*Update my local LTS */
+			if(debug){
+
+				printf("\nGoing to update my LTS now for server: %d with counter: %d", update_packet->update_lts.LTS_server_id,update_packet->update_lts.LTS_counter);
+				fflush(stdout);
+			}
+			local_var->my_vector[update_packet->update_lts.LTS_server_id]=update_packet->update_lts.LTS_counter;
+			/*Adapt to new LTS counter*/
+			if(update_packet->update_lts.LTS_counter > local_var->my_lts.LTS_counter){
+				local_var->my_lts.LTS_counter=update_packet->update_lts.LTS_counter;
+			}
+			switch(update_packet->update_type){
+
+				case JOIN: 
+					if(debug){
+						printf("\n-------------Got a MESSAge to join %s---------------",update_packet->update_chat_room);
+
+					}
+					process_join(update_packet->update_chat_room,local_var,update_packet->update_data.data_join.join_packet_user,update_packet->update_lts.LTS_server_id);
+					response_packet *join_p= create_response_packet(R_JOIN,local_var);
+					sprintf(join_p->data.users[0],"%s",update_packet->update_data.data_join.join_packet_user);			
+
+					if(debug){
+						printf("\n-------------Got a MESSAge to join %s---------------",update_packet->update_chat_room);
+
+					}
+					send_packet(update_packet->update_chat_room,join_p,local_var,0);
+
+					break;
+				case LIKE:
+
+					process_client_update(update_packet->update_type,local_var,update_packet->update_data.data_like.like_packet_user, update_packet->update_chat_room, update_packet->update_data.data_like.like_packet_line_no_lts);
+					break;
+				case MSG:
+					if(debug){
+						printf("\n In update, chatroom: %s",update_packet->update_chat_room);
+					}
+					process_append(local_var, update_packet->update_chat_room, update_packet->update_data.data_line.line_packet_user,update_packet->update_data.data_line.line_packet_message,update_packet->update_data.data_line.line_packet_lts );
+
+					break;
+				case UNLIKE:
+
+					process_client_update(update_packet->update_type,local_var,update_packet->update_data.data_like.like_packet_user, update_packet->update_chat_room, update_packet->update_data.data_like.like_packet_line_no_lts);
+					break;
+				case LEAVE:
+					process_leave_chatroom(update_packet->update_chat_room,local_var,update_packet->update_data.data_join.join_packet_user,update_packet->update_lts.LTS_server_id);
+					response_packet *join_p1= create_response_packet(R_LEAVE,local_var);
+					sprintf(join_p1->data.users[0],"%s",update_packet->update_data.data_join.join_packet_user);			
+					send_packet(update_packet->update_chat_room,join_p1,local_var,0);
+
+
+
+					break;
+			}
+		}
+	}
+	else{  /*Processing merge packet*/
+
+		/*TODO : ONLY when current memb ID`*/
+
+		int k;
+		local_var->vectors_cnt++;
+
+		for(k=1;k<6;k++){
+
+			local_var->recvd_vectors[update_packet->update_data.data_merge.source_id][k]=update_packet->update_data.data_merge.vector[k];
+		}
+
+		if(debug){
+
+			printf("\n Count of local vec: %d - total members: %d \n",local_var->vectors_cnt,local_var->total_members);
+			fflush(stdout);
+		}
+		if(local_var->vectors_cnt==local_var->total_members){
+
+			reconcile_merge(local_var);
+
+
+		}
+
+
+		if(debug){
+
+			printf("\n  after processing  MERGE: source id  %d    ",update_packet->update_data.data_merge.source_id);
+			printf("\n Printing vector received:\n");
+			int i;
+			for(i=0;i<6;i++){
+
+				printf(" %d\t",local_var->recvd_vectors[update_packet->update_data.data_merge.source_id][i]);
+			}
+			fflush(stdout);
+
+		}
+
+
 	}
 }
 
@@ -1042,6 +1326,13 @@ void process_message(char* mess,char* sender, server_variables *local_var){
 		case MSG:  			  
 			local_var->my_lts.LTS_counter++;
 
+			local_var->my_vector[local_var->machine_id]=local_var->my_lts.LTS_counter;
+
+			if(debug){
+				printf("\nI got a message, changing my vector");
+				fflush(stdout);
+			}
+
 			line_packet lp=process_append(local_var,recv_packet->request_packet_chatroom, recv_packet->request_packet_user, recv_packet->request_packet_data, local_var->my_lts);
 			propagate_append_update(local_var, lp, local_var->my_lts, recv_packet->request_packet_chatroom);
 
@@ -1050,6 +1341,8 @@ void process_message(char* mess,char* sender, server_variables *local_var){
 
 
 			local_var->my_lts.LTS_counter++;
+
+			local_var->my_vector[local_var->machine_id]=local_var->my_lts.LTS_counter;
 			if(debug){
 				printf("\nGot message::: %d type",recv_packet->request_packet_type);
 			}
@@ -1063,6 +1356,9 @@ void process_message(char* mess,char* sender, server_variables *local_var){
 			   char group[SIZE]="\0";
 			   sscanf(recv_packet->request_packet_data,"%s",group);
 			   local_var->my_lts.LTS_counter++;
+
+
+			   local_var->my_vector[local_var->machine_id]=local_var->my_lts.LTS_counter;
 
 			   response_packet *response1=create_response_packet(R_ACK,local_var);
 
@@ -1167,6 +1463,8 @@ void process_message(char* mess,char* sender, server_variables *local_var){
 
 
 			   local_var->my_lts.LTS_counter++;
+
+			   local_var->my_vector[local_var->machine_id]=local_var->my_lts.LTS_counter;
 			   if(debug){
 				   printf("\nGot message::: %d type",recv_packet->request_packet_type);
 			   }
@@ -1188,6 +1486,9 @@ void process_message(char* mess,char* sender, server_variables *local_var){
 				   printf("\n----------------_CHAT ROOM: %s--------------------",group1);
 			   }
 			   local_var->my_lts.LTS_counter++;
+
+
+			   local_var->my_vector[local_var->machine_id]=local_var->my_lts.LTS_counter;
 			   process_leave_chatroom(group1,local_var,recv_packet->request_packet_user,local_var->machine_id);
 			   response_packet *leave_p= create_response_packet(R_LEAVE,local_var);
 			   sprintf(leave_p->data.users[0],"%s",recv_packet->request_packet_user);
@@ -1197,6 +1498,7 @@ void process_message(char* mess,char* sender, server_variables *local_var){
 			   break;
 
 	}
+
 }
 
 
@@ -1208,7 +1510,11 @@ void propagate_like_update( server_variables *local_var,request_packet* recv_pac
 	union_update_data lpacket;
 	memcpy(&lpacket,&lp,sizeof(like_packet));
 	node* new_update=create_update(var,update_lts, recv_packet->request_packet_chatroom,lpacket);
-	append(local_var->update_list,new_update);
+
+	int r;
+	node* old=seek(local_var->update_list, update_lts,&r);
+	insert(local_var->update_list, new_update, old);
+
 	update* to_send=(update*)new_update->data;
 	send_update(local_var,to_send);
 
@@ -1223,7 +1529,13 @@ void propagate_join_update(server_variables *local_var,request_packet* recv_pack
 	union_update_data jpacket;
 	memcpy(&jpacket,&jp,sizeof(jp));
 	new_update=create_update(var,update_lts,recv_packet->request_packet_chatroom,jpacket);
-	append(local_var->update_list,new_update);
+
+
+	int r;
+	node* old=seek(local_var->update_list, update_lts,&r);
+	insert(local_var->update_list, new_update, old);
+
+
 	update* to_send=(update*)new_update->data;
 	if(debug){
 		printf("\n---------Printing propogate join message--------\n  %s \n", recv_packet->request_packet_chatroom);
@@ -1240,7 +1552,14 @@ void propagate_append_update(server_variables *local_var,line_packet lp, LTS upd
 	union_update_data lpacket;
 	memcpy(&lpacket,&lp,sizeof(lp));
 	new_update=create_update(MSG,update_lts,room,lpacket);
-	append(local_var->update_list,new_update);
+
+	int r;
+	node* old=seek(local_var->update_list, update_lts,&r);
+	insert(local_var->update_list, new_update, old);
+
+
+
+
 	update* to_send=(update*)new_update->data;
 
 	send_update(local_var,to_send);
