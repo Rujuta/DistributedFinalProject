@@ -199,17 +199,29 @@ void leave_chatroom(client_variables* local_var){
 
 	int ret;
 	if(local_var->my_state == IN_CHATROOM){
-		ret = SP_leave( Mbox, local_var->my_chatroom->chatroom_name);
+
+			
+		 char chatroom1[SIZE]="\0";
+		 strcat(chatroom1,local_var->my_chatroom->chatroom_name);
+		 strcat(chatroom1,public_server_grps[local_var->my_server]);
+		
+
+
+		ret = SP_leave( Mbox, chatroom1);
 		if( ret < 0 ) SP_error( ret );
 		if(debug){
-			fprintf(log1,"\nleft Chatroom");
-			fflush(log1);
+			printf("\nleft Chatroom %s", chatroom1);
+			fflush(stdout);
 		}
 		LTS my_lts;
 		my_lts.LTS_counter=-1;
 		my_lts.LTS_server_id=local_var->my_server;
 		create_packet(LEAVE,local_var->username,my_lts,local_var);
 		local_var->my_state=LOG_CONN;
+
+		free(local_var->my_chatroom);
+		initialize_chatroom(local_var);
+
 	}
 }
 void process_input(char* input, client_variables *local_var){
@@ -729,6 +741,7 @@ void process_message(char* mess,client_variables *local_var){
 				i++;
 
 			}
+			
 			refresh_screen(local_var);
 
 			break;
@@ -740,9 +753,19 @@ void process_message(char* mess,client_variables *local_var){
 				node *new_user=create_meta(new_response->data.users[0]);
 				append(local_var->my_chatroom->users,new_user);
 			}
+			
 			refresh_screen(local_var);
 			break;
 		case R_LEAVE:
+;
+			int retval1;
+			node* to_del=seek_user(local_var->my_chatroom->users, new_response->data.users[0],&retval1);
+			if(retval1==1){
+				delete(local_var->my_chatroom->users,to_del);
+			}
+			
+			refresh_screen(local_var);
+
 			break;
 		case R_HISTORY:
 			//refresh_screen(local_var);
@@ -813,12 +836,14 @@ void process_message(char* mess,client_variables *local_var){
 				}
 			}
 			print_line(local_var->my_chatroom->chatroom_msgs);
+			
 			refresh_screen(local_var);
 
 			break;
 		case R_VIEW: /*Got list of servers, need to show to screen*/
 			;     
 			int k=1;
+			
 			refresh_screen(local_var);
 			printf("\nServers in current partition are: \t");
 			while(k<6){

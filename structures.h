@@ -178,6 +178,7 @@ typedef struct my_variables_server{
 	linked_list *undelivered_update_list;
 	LTS my_vector[6];
 	int current_members[6];
+	linked_list* server_chats[6];
 }server_variables;
 
 

@@ -10,6 +10,7 @@
 #define MAXINT 2147483647
 
 
+void propagate_like_update( server_variables *local_var,request_packet* recv_packet, LTS update_lts, request);
 char *public_server_grps[6]={"dummy","s1","s2","s3","s5","s6"};
 char *private_server_grps[6]={"dummy","server1","server2","server3","server5","server6"};
 
@@ -20,8 +21,8 @@ void send_packet(char *group_name, response_packet *packet, server_variables *lo
 void process_update(char* mess, server_variables *local_var);
 chatroom* process_join(char* group, server_variables *local_var,char *user);
 void send_update(server_variables *local_var, update* to_send);
-void propagate_join_update(server_variables *local_var,request_packet* recv_packet, LTS update_lts);
-void process_client_update(request type, server_variables *local_var, request_packet* recv_packet);
+void propagate_join_update(server_variables *local_var,request_packet* recv_packet, LTS update_lts,request);
+void process_client_update(request type, server_variables *local_var, char*, char* ,LTS);
 response_packet* create_response_packet(response type, server_variables* local_var);
 
 void process_message(char* mess,char* sender, server_variables *local_var);
@@ -104,6 +105,7 @@ int main(int argc, char* argv[]){
 	local_var.update_list=(linked_list*)get_linked_list(LIST_UPDATE);
 	local_var.undelivered_update_list=(linked_list*)get_linked_list(LIST_UPDATE);
 
+
 	int k=1;
 	LTS init;
 	init.LTS_counter=-1;
@@ -112,6 +114,7 @@ int main(int argc, char* argv[]){
 	while(k<6){
 
 		local_var.my_vector[k]=init;
+		local_var.server_chats[k]=(linked_list*)get_linked_list(LIST_CHATROOM);
 		k++;
 	}
 	/*Here you will load old DATA of chatrooms into the chatlists structure*/
@@ -187,7 +190,6 @@ static  void    Bye()
 }
 
 
-/*Send a packet to the server client is connected to*/
 void send_packet(char *group_name, response_packet *packet, server_variables *local_var, int flag){
 
 
@@ -221,11 +223,7 @@ void send_packet(char *group_name, response_packet *packet, server_variables *lo
 	printf("\nLeaving send\n");
 }
 
-/*Create packet of a specified type
- * to send to server*/
-void create_packet(){
 
-}
 
 static  void    Assign(char *argv[])
 {
@@ -388,6 +386,79 @@ static  void    Read_message(int a, int b, void *local_var_arg)
 
 }
 
+void process_leave_chatroom(char* group, server_variables *local_var, char* user){
+
+	int ret_val;
+	node *prev, *temp, *user_check;
+	chatroom *my_data3;
+	prev= seek_chatroom(local_var->chat_lists,group,&ret_val);
+
+	if(ret_val==1){
+
+
+		if(prev==NULL){
+			temp=local_var->chat_lists->head;
+		}
+		else{
+			temp=prev->next;
+		}
+
+
+
+		my_data3=(chatroom*)temp->data;
+
+
+		user_check=seek_user(my_data3->users,user,&ret_val);
+		node* prev_user=user_check;
+		if(ret_val==1){
+			if(user_check==NULL){
+				//user exists and is the first user 
+				user_check=my_data3->users->head;
+
+			}
+			else{
+
+				user_check=user_check->next;
+
+			}
+			//increment count of user
+
+
+			((meta*)user_check->data)->cnt--;
+
+			/*If count of users equals to 0, delete this guy */
+			if( (((meta*)user_check->data)->cnt) == 0){
+
+				delete(my_data3->users,prev_user);
+
+			}
+
+			if(debug){
+			printf("\n-------------PRINTING AFTER DELETING ------------------\n");
+		}
+			print_meta(my_data3->users);
+
+
+		}
+		else{
+
+			printf("\n User doesn't exist in chatroom, some error in code\n");
+		}
+
+
+
+	}
+	else{
+
+		printf("\nSome error in code, chat room doesn't seem to exist! %s\n", group);
+	}
+
+
+
+}
+
+
+
 chatroom* process_join(char* group, server_variables *local_var, char* user){
 
 	/*First check if this chatroom exists in the list
@@ -404,7 +475,6 @@ chatroom* process_join(char* group, server_variables *local_var, char* user){
 	if(ret_val==1){
 		//chat room exists
 
-		//send all the data in chat room so far
 		if(prev==NULL){
 			temp=local_var->chat_lists->head;
 		}
@@ -442,6 +512,11 @@ chatroom* process_join(char* group, server_variables *local_var, char* user){
 			append(my_data3->users,user_node);
 		}
 
+		if(debug){
+			printf("\n-------------PRINTING from join process AFTER joining------------------\n");
+		}
+		print_meta(my_data3->users);
+
 
 	}
 	else{
@@ -459,8 +534,10 @@ chatroom* process_join(char* group, server_variables *local_var, char* user){
 
 		/*Join the chat group first on spread*/
 		int ret;
-		strcat(group,public_server_grps[local_var->machine_id]);
-		ret = SP_join( Mbox, group);
+		char gr[SIZE]="\0";
+		strcat(gr,group);
+		strcat(gr,public_server_grps[local_var->machine_id]);
+		ret = SP_join( Mbox, gr);
 		if( ret < 0 ) {
 			SP_error( ret );
 			Bye();
@@ -496,13 +573,25 @@ void process_update(char* mess, server_variables *local_var){
 		local_var->my_lts.LTS_counter=update_packet->update_lts.LTS_counter;
 		switch(update_packet->update_type){
 
-			case JOIN: process_join(update_packet->update_chat_room,local_var,update_packet->update_data.data_join.join_packet_user);
+			case JOIN: 
+				   if(debug){
+				   	printf("\n-------------Got a MESSAge to join %s---------------",update_packet->update_chat_room);
+
+				   }
+				   process_join(update_packet->update_chat_room,local_var,update_packet->update_data.data_join.join_packet_user);
 				   response_packet *join_p= create_response_packet(R_JOIN,local_var);
 				   sprintf(join_p->data.users[0],"%s",update_packet->update_data.data_join.join_packet_user);			
+				   
+				   if(debug){
+				   	printf("\n-------------Got a MESSAge to join %s---------------",update_packet->update_chat_room);
+
+				   }
 				   send_packet(update_packet->update_chat_room,join_p,local_var,0);
 
 				   break;
 			case LIKE:
+
+				   process_client_update(update_packet->update_type,local_var,update_packet->update_data.data_like.like_packet_user, update_packet->update_chat_room, update_packet->update_data.data_like.like_packet_line_no_lts);
 				   break;
 			case MSG:
 				   if(debug){
@@ -512,8 +601,17 @@ void process_update(char* mess, server_variables *local_var){
 
 				   break;
 			case UNLIKE:
+
+				   process_client_update(update_packet->update_type,local_var,update_packet->update_data.data_like.like_packet_user, update_packet->update_chat_room, update_packet->update_data.data_like.like_packet_line_no_lts);
 				   break;
 			case LEAVE:
+				   process_leave_chatroom(update_packet->update_chat_room,local_var,update_packet->update_data.data_join.join_packet_user);
+				   response_packet *join_p1= create_response_packet(R_LEAVE,local_var);
+				   sprintf(join_p1->data.users[0],"%s",update_packet->update_data.data_join.join_packet_user);			
+				   send_packet(update_packet->update_chat_room,join_p1,local_var,0);
+
+
+
 				   break;
 		}
 	}
@@ -570,6 +668,8 @@ line_packet process_append(server_variables *local_var,char *croom1, char* user,
 
 
 }
+
+
 void process_message(char* mess,char* sender, server_variables *local_var){
 
 	int ret;
@@ -590,15 +690,20 @@ void process_message(char* mess,char* sender, server_variables *local_var){
 
 			break;
 		case UNLIKE:
+
+
+			local_var->my_lts.LTS_counter++;
 			if(debug){
 				printf("\nGot message::: %d type",recv_packet->request_packet_type);
 			}
-			process_client_update(recv_packet->request_packet_type,local_var,recv_packet);
+			process_client_update(recv_packet->request_packet_type,local_var,recv_packet->request_packet_user, recv_packet->request_packet_chatroom, recv_packet->request_packet_lts);
+
+			propagate_like_update(local_var,recv_packet,local_var->my_lts, UNLIKE);
 
 			break;
 		case JOIN: printf("\nGot a message of join");
 			   printf("\nRequest to join chat room: %s",recv_packet->request_packet_data);
-			   char group[SIZE];
+			   char group[SIZE]="\0";
 			   sscanf(recv_packet->request_packet_data,"%s",group);
 			   local_var->my_lts.LTS_counter++;
 
@@ -642,10 +747,13 @@ void process_message(char* mess,char* sender, server_variables *local_var){
 				   temp= temp->next;
 			   }
 
+			   response_packet *join_p= create_response_packet(R_JOIN,local_var);
+			   sprintf(join_p->data.users[0],"%s",recv_packet->request_packet_user);
+			   send_packet(recv_packet->request_packet_chatroom,join_p,local_var,0);
 
 
 			   /*Create a join update*/
-			   propagate_join_update(local_var,recv_packet, local_var->my_lts);
+			   propagate_join_update(local_var,recv_packet, local_var->my_lts,JOIN);
 
 			   break;
 		case HISTORY:
@@ -699,12 +807,36 @@ void process_message(char* mess,char* sender, server_variables *local_var){
 			   send_packet(sender,v_response,local_var,1); 
 			   break;
 		case LIKE:
+
+
+			   local_var->my_lts.LTS_counter++;
 			   if(debug){
 				   printf("\nGot message::: %d type",recv_packet->request_packet_type);
 			   }
-			   process_client_update(recv_packet->request_packet_type,local_var,recv_packet);
 
+			   process_client_update(recv_packet->request_packet_type,local_var,recv_packet->request_packet_user, recv_packet->request_packet_chatroom, recv_packet->request_packet_lts);
+			   propagate_like_update(local_var,recv_packet,local_var->my_lts, LIKE);
 			   /*Create an update for like*/
+			   break;
+
+		case LEAVE:
+
+			   if(debug){
+				   printf("\nGot a msg of leave\n");
+				   fflush(stdout);
+			   }
+			   char group1[SIZE]="\0";
+			   sscanf(recv_packet->request_packet_chatroom,"%s",group1);
+			   if(debug){
+			   	printf("\n----------------_CHAT ROOM: %s--------------------",group1);
+			   }
+			   local_var->my_lts.LTS_counter++;
+			   process_leave_chatroom(group1,local_var,recv_packet->request_packet_user);
+			   response_packet *leave_p= create_response_packet(R_LEAVE,local_var);
+			   sprintf(leave_p->data.users[0],"%s",recv_packet->request_packet_user);
+			   send_packet(recv_packet->request_packet_chatroom,leave_p,local_var,0);
+
+			   propagate_join_update(local_var,recv_packet, local_var->my_lts,LEAVE);
 			   break;
 
 	}
@@ -712,17 +844,34 @@ void process_message(char* mess,char* sender, server_variables *local_var){
 
 
 
-void propagate_join_update(server_variables *local_var,request_packet* recv_packet, LTS update_lts){
+
+void propagate_like_update( server_variables *local_var,request_packet* recv_packet, LTS update_lts, request var){
+
+	like_packet lp=create_like_packet(recv_packet->request_packet_lts,recv_packet->request_packet_user);
+	union_update_data lpacket;
+	memcpy(&lpacket,&lp,sizeof(like_packet));
+	node* new_update=create_update(var,update_lts, recv_packet->request_packet_chatroom,lpacket);
+	append(local_var->update_list,new_update);
+	update* to_send=(update*)new_update->data;
+	send_update(local_var,to_send);
+
+
+}
+
+void propagate_join_update(server_variables *local_var,request_packet* recv_packet, LTS update_lts, request var){
 
 	join_packet jp;
 	sprintf(jp.join_packet_user,recv_packet->request_packet_user);
 	node* new_update;
 	union_update_data jpacket;
 	memcpy(&jpacket,&jp,sizeof(jp));
-	new_update=create_update(JOIN,update_lts,recv_packet->request_packet_chatroom,jpacket);
+	new_update=create_update(var,update_lts,recv_packet->request_packet_chatroom,jpacket);
 	append(local_var->update_list,new_update);
 	update* to_send=(update*)new_update->data;
-
+	if(debug){
+		printf("\n---------Printing propogate join message--------\n  %s \n", recv_packet->request_packet_chatroom);
+		
+	}
 	send_update(local_var,to_send);
 
 }
@@ -759,7 +908,7 @@ void send_update(server_variables *local_var, update* to_send){
 }
 
 
-void process_client_update(request type, server_variables *local_var, request_packet* recv_packet){
+void process_client_update(request type, server_variables *local_var, char* u_user, char* u_room, LTS line_lts){
 
 
 
@@ -768,12 +917,12 @@ void process_client_update(request type, server_variables *local_var, request_pa
 		printf("\nGot LIKE\n");
 	}
 	char group[SIZE];
-	sscanf(recv_packet->request_packet_chatroom,"%s",group);
+	sscanf(u_room,"%s",group);
 	//local_var->my_lts.LTS_counter++;
 	LTS to_find;
 
 	//got the LTS to seek
-	to_find=recv_packet->request_packet_lts;
+	to_find=line_lts;
 
 	//get chatroom from msg
 
@@ -820,7 +969,7 @@ void process_client_update(request type, server_variables *local_var, request_pa
 
 			//seek for user to see if user has liked
 			int ret_val3;
-			node* user1=seek_user(selected_line->line_meta, recv_packet->request_packet_user,&ret_val3);
+			node* user1=seek_user(selected_line->line_meta, u_user,&ret_val3);
 			switch(type){
 
 				case LIKE: 
@@ -828,14 +977,14 @@ void process_client_update(request type, server_variables *local_var, request_pa
 						if(debug){
 							printf("\nGot user");
 						}
-						node* new_user= create_meta(recv_packet->request_packet_user);
+						node* new_user= create_meta(u_user);
 						append(selected_line->line_meta,new_user);
 						selected_line->line_content.line_packet_likes++;
 
 						response_packet *line_p= create_response_packet(R_MSG,local_var);
 						memcpy(&(line_p->data),&(selected_line->line_content),sizeof(line_packet));
 
-						send_packet(recv_packet->request_packet_chatroom,line_p,local_var,0);
+						send_packet(u_room,line_p,local_var,0);
 
 					}
 
@@ -850,7 +999,7 @@ void process_client_update(request type, server_variables *local_var, request_pa
 						selected_line->line_content.line_packet_likes--;
 						response_packet *line_p= create_response_packet(R_MSG,local_var);
 						memcpy(&(line_p->data),&(selected_line->line_content),sizeof(line_packet));
-						send_packet(recv_packet->request_packet_chatroom,line_p,local_var,0);
+						send_packet(u_room,line_p,local_var,0);
 
 					}
 
