@@ -12,6 +12,7 @@
 
 
 
+int check_causality(server_variables* local_var,update* update_packet);
 
 void recover(server_variables *local_var);
 
@@ -109,14 +110,14 @@ int main(int argc, char* argv[]){
 	strcat(filename2,argv[1]);
 	backup=fopen(filename2,"a+b");
 	if(backup==NULL){
-	
-		 printf("\nError opening file");
-		                 exit(1);
+
+		printf("\nError opening file");
+		exit(1);
 	}
 	read_backup=fopen(filename2,"r+b");
 	if(read_backup==NULL){
-		 printf("\nError opening file");
-		 exit(1);
+		printf("\nError opening file");
+		exit(1);
 
 	}
 
@@ -169,11 +170,11 @@ int main(int argc, char* argv[]){
 
 	/*Here you will load old DATA of chatrooms into the chatlists structure*/
 	//TODO - Make sure you need data structures from files
-	
-//	init_data_structures(&local_var);
+
+	//	init_data_structures(&local_var);
 	connect_to_spread(&local_var);
-	
-	
+
+
 	recover(&local_var);	
 	/*Initialize Spread event handling system*/
 	E_init();
@@ -195,7 +196,7 @@ void recover(server_variables *local_var){
 
 	update *u;
 	while(!feof(read_backup)){
-			
+
 		node* new_update=get_node(LIST_UPDATE);
 		fread((update*)new_update->data,sizeof(update),1,read_backup);
 		if(((update *)new_update->data)->update_lts.LTS_counter==0)
@@ -205,21 +206,21 @@ void recover(server_variables *local_var){
 		/*when this last param is 0 - the server DOESN't send the update*/
 		process_update((char*)u,local_var,0);	
 	}
-	
+
 	//local_var->update_list->tail=NULL;
-//	print_update(local_var->update_list);
+	//	print_update(local_var->update_list);
 
-//	printf("\nDone printing\n");
-//	fflush(stdout);
-//	exit(0);
+	//	printf("\nDone printing\n");
+	//	fflush(stdout);
+	//	exit(0);
 
-	
+
 
 }
 
 
 void write_to_file(server_variables* local_var, update* new_update){
-	
+
 	/*Write update TYPE*/
 
 	fwrite( new_update,sizeof(update), 1, backup);
@@ -274,6 +275,41 @@ void send_my_updates(server_variables *local_var, int min){
 		}
 
 
+
+	}
+	else{
+
+		if(debug){
+
+			printf("\n Sending EVERYTHING I have \n");
+			fflush(stdout);
+		}
+		if(start.LTS_counter==-1){
+
+			temp=local_var->update_list->head;
+
+			while(temp!=NULL){
+
+				update* my_update = (update*)temp->data;
+				if(my_update->update_lts.LTS_server_id==local_var->machine_id){
+
+					/*This is an update in chronological order after min*/
+					/*Create an update and send it */
+
+					if(debug){
+						printf("\nSending update FROM SEND_MY_UPDATE  with LTS : %d server : %d\n",my_update->update_lts.LTS_counter,my_update->update_lts.LTS_server_id);
+						fflush(stdout);
+					}
+					send_update(local_var,my_update);
+
+
+				}
+
+
+				temp=temp->next;
+			}
+
+		}
 
 	}
 }
@@ -366,6 +402,7 @@ void reconcile_merge(server_variables *local_var){
 
 			if(flag==1){
 				LTS start,stop;
+
 				start.LTS_counter=min;
 				start.LTS_server_id=j;
 
@@ -425,10 +462,44 @@ void reconcile_merge(server_variables *local_var){
 					}
 
 				}else{
+
+
 					if(debug){
-						printf("\n....in or for ret val in sending other ppls stuff...\n");
+						printf("\n....in min =-1 for sending other ppls stuff...\n");
 						fflush(stdout);
 					}
+
+					temp= local_var->update_list->head;
+
+					while(temp!=NULL){
+
+
+						update* my_update = (update*)temp->data;
+						if(my_update->update_lts.LTS_counter>stop.LTS_counter){
+
+							if(debug){
+								printf("\n....found lts greater then stop...\n");
+								fflush(stdout);
+							}
+
+
+							break;
+						}
+						if(my_update->update_lts.LTS_server_id==j){
+
+							/*This is an update in chronological order after min*/
+							/*Create an update and send it */
+
+							if(debug){
+								printf("\nSending update with LTS : %d server : %d\n",my_update->update_lts.LTS_counter,my_update->update_lts.LTS_server_id);
+								fflush(stdout);
+							}
+							send_update(local_var,my_update);
+
+						}
+						temp=temp->next;
+					}
+
 
 				}
 
@@ -741,8 +812,25 @@ static  void    Read_message(int a, int b, void *local_var_arg)
 				fprintf(log1,"Due to the JOIN of %s\n", memb_info.changed_member );
 				printf("\nGroup joined: %s",sender);
 
+				if(strcmp(sender,SERVER_GRP)==0){
+					//init counter that keeps track of no of local vectors received
+					local_var->vectors_cnt=1;
+
+					//TODO set member ship ID here. 
+
+					/*Reinit received vectors matrix*/
+					int k,w;
+					for(k=0;k<6;k++){
+
+						for(w=0;w<6;w++)
+							local_var->recvd_vectors[k][w]=0;
+					}	
 
 
+
+					//send my local vector to everyone in group
+					create_merge_packet(local_var);
+				}
 
 			}else if( Is_caused_leave_mess( service_type ) ){
 				printf("Due to the LEAVE of %s\n", memb_info.changed_member );
@@ -1256,6 +1344,146 @@ chatroom* process_join(char* group, server_variables *local_var, char* user, int
 
 	return my_data3;
 }
+
+
+int check_causality(server_variables* local_var,update* update_packet){
+
+
+	if(debug){
+		printf("\nEntering check causaloty\n");
+		fflush(stdout);
+	}
+	node* temp, *prev, *line_node,*c_node;
+	/*If type is of like
+	 * Check seek for an LTS in messages 
+	 * if LTS found - deliver it - return 1*/
+	if(update_packet->update_type==LIKE || update_packet->update_type==UNLIKE){
+
+		int ret_val;
+		/*Check if chatroom exists*/
+		prev=seek_chatroom(local_var->chat_lists,update_packet->update_chat_room,&ret_val);
+
+		/*Chatroom found, search for line now*/ 
+		if(ret_val==1){
+
+			if(prev==NULL){
+
+				prev=local_var->chat_lists->head;
+
+			}
+			else{
+
+				prev=prev->next;
+			}
+
+			chatroom *croom= (chatroom*)prev->data;
+			int ret;
+			LTS line_lts=update_packet->update_data.data_like.like_packet_line_no_lts;
+
+
+			node *lp1= seek(croom->chatroom_msgs,line_lts,&ret);
+
+			if(lp1 == NULL){
+
+				lp1=croom->chatroom_msgs->head;
+
+			}else{
+
+				lp1= lp1->next;
+			}
+
+
+
+			line* lp= (line*)lp1->data;
+			/*Line has been found*/
+			if(ret==1){
+
+				if(update_packet->update_type==LIKE){
+
+					if(debug){
+
+						printf("\n Returns 1  as msg  of type like exists  \n");
+					}
+
+					return 1;
+				}
+				else{ 
+
+					/*Search for users to see if user matches*/
+
+					int ret_val2;
+					print_meta(lp->line_meta);
+					node* user=seek_user(lp->line_meta, update_packet->update_data.data_like.like_packet_user,&ret_val2);
+					if(ret_val2==1){
+
+						if(debug){
+
+							printf("\n Returns 1  as msg  of type unlike and user exists  \n");
+						}
+						/*User in list of likes so unlike can be delivered*/
+						return 1;
+
+
+
+
+					}
+					else{
+
+
+						if(debug){
+
+							printf("\n Returns 0  as msg is user who liked doesn't exist, so can't unlike  : user is :%s\n",update_packet->update_data.data_like.like_packet_user);
+						}	
+						return 0;
+					}
+
+
+				}
+
+
+			}
+			else{
+
+				if(debug){
+
+					printf("\n Returns 0 as line DOESN't exist \n");
+				}	
+				return 0;
+			}
+
+		}
+		else{
+
+			if(debug){
+
+				printf("\nReturns 0 - CHATROOM NOT existing %s\n",update_packet->update_chat_room);
+			}
+			return 0;
+		}
+	}
+	else{
+
+		if(debug){
+
+			printf("\n Returns 1 as msg is NOT of type LIKE / UNLIKE \n");
+		}	
+		return 1;
+	}
+
+	/*If type is unlike, check if like for the line exists
+	 * if so, return 1 else 0*/
+
+
+	if(debug){
+		printf("\nLeaving check causaloty\n");
+		fflush(stdout);
+	}
+
+
+
+}
+
+/*When send_flag == 1 this update needs to be sent to my users !!*/
 void process_update(char* mess, server_variables *local_var, int send_flag){
 
 	int ret;
@@ -1267,20 +1495,46 @@ void process_update(char* mess, server_variables *local_var, int send_flag){
 
 	if(update_packet->update_type!=MERGE){
 		/*Do causality check*/
-		//int flag= check_causality(local_var,update_packet->update_lts);
-		int flag=1;
+		int flag;
+
+		if(send_flag == 1){
+			flag= 1;//check_causality(local_var,update_packet);
+		}else{
+
+			flag =1;
+		}
+		//int flag=1;
 
 		if(flag==0){
 			/*Causally dependent*/
 
-			//append(local_var->undelivered_update_list,new_update);
+
+			append(local_var->undelivered_update_list,new_update);
 		}
 		else{
 			int r;
 			node* old=seek(local_var->update_list, update_packet->update_lts,&r);
-			
+
 			if(update_packet->update_type!=JOIN && update_packet->update_type!=LEAVE){
+
+
 				insert(local_var->update_list,new_update,old);
+				if(send_flag==1){
+					write_to_file(local_var,update_packet);
+				}
+				/*Remove from undelivered*/
+				/*	int ret_val10;
+					node* to_del=seek(local_var->undelivered_update_list,update_packet->update_lts, &ret_val10);
+					if(ret_val10==1){ //in undelivered
+
+					if(debug){
+					printf("\n Deleting to_del undelivered msg with LTS counter: %d server id: %d", update_packet->update_lts.LTS_counter,update_packet->update_lts.LTS_server_id);
+
+					fflush(stdout);
+					}
+					delete(local_var->undelivered_update_list,to_del);
+
+					}*/
 			}
 
 			/*Update my local LTS */
@@ -1332,7 +1586,7 @@ void process_update(char* mess, server_variables *local_var, int send_flag){
 
 					if(send_flag==1)
 					{
-					send_packet(update_packet->update_chat_room,line_p,local_var,0);
+						send_packet(update_packet->update_chat_room,line_p,local_var,0);
 					}
 
 
@@ -1356,6 +1610,35 @@ void process_update(char* mess, server_variables *local_var, int send_flag){
 
 					break;
 			}
+
+
+
+			/*since message has just been delivered, check if you can deliver any other msgs */
+			/*			if(!is_empty(local_var->undelivered_update_list)){
+
+						if(debug){
+
+						printf("\nThere are undelivered MSGS, PROCESSING THEM\n");
+						fflush(stdout);
+						}
+						node* temp=local_var->undelivered_update_list->head;
+						while(temp!=NULL){
+						update* old_update=(update*)temp->data;
+
+						process_update((char*)old_update,local_var,send_flag );
+
+						temp=temp->next;
+						}
+
+
+						if(debug){
+
+						printf("\nexiting undelivered MSGS,  \n");
+						fflush(stdout);
+						}
+
+						}*/
+
 		}
 	}
 	else{  /*Processing merge packet*/
@@ -1459,9 +1742,9 @@ line_packet process_append(server_variables *local_var,char *croom1, char* user,
 
 
 		printf("\nChatroom Doesn't exist - creating new room - HAS to be created in recover \n");
-		
-		
-		
+
+
+
 		node* newly_created_room=(node*)create_chatroom(croom1);
 		append(local_var->chat_lists,newly_created_room);
 
@@ -1469,9 +1752,9 @@ line_packet process_append(server_variables *local_var,char *croom1, char* user,
 		//node* user_node=create_meta(user);
 		chatroom* my_data3=(chatroom*)newly_created_room->data;
 
-	//	meta* u=(meta*)my_data3->users->head->data;
+		//	meta* u=(meta*)my_data3->users->head->data;
 
-		
+
 		append(my_data3->chatroom_msgs,new_line);
 		/*Join the chat group first on spread*/
 		int ret=9;
@@ -1722,9 +2005,9 @@ void propagate_like_update( server_variables *local_var,request_packet* recv_pac
 	insert(local_var->update_list, new_update, old);
 
 	update* to_send=(update*)new_update->data;
-	
-			/*Write update to file*/
-			write_to_file(local_var,to_send);
+
+	/*Write update to file*/
+	write_to_file(local_var,to_send);
 	send_update(local_var,to_send);
 
 
@@ -1735,7 +2018,7 @@ void propagate_join_update(server_variables *local_var,request_packet* recv_pack
 	join_packet jp;
 	sprintf(jp.join_packet_user,recv_packet->request_packet_user);
 	node* new_update;
-	
+
 	union_update_data jpacket;
 	memcpy(&jpacket,&jp,sizeof(jp));
 	new_update=create_update(var,update_lts,recv_packet->request_packet_chatroom,jpacket);
@@ -1772,12 +2055,12 @@ void propagate_append_update(server_variables *local_var,line_packet lp, LTS upd
 
 	update* to_send=(update*)new_update->data;
 
-	
-			/*Write update to file*/
-			write_to_file(local_var,to_send);
+
+	/*Write update to file*/
+	write_to_file(local_var,to_send);
 	//print_update(local_var->update_list);
 
-		send_update(local_var,to_send);
+	send_update(local_var,to_send);
 
 }
 
