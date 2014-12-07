@@ -7,6 +7,8 @@
 
 LTS get_LTS(client_variables *local_var,int line_no_liked);
 
+void print_display();
+
 void process_message(char* mess,client_variables *local_var);
 
 /*This will be joined by the client initially so that it can check if server is alive and get membership msgs*/
@@ -93,6 +95,7 @@ int main(int argc, char* argv[]){
 
 	/*Connect to spread*/
 	connect_to_spread(&local_var);
+	print_display();
 
 	/*Initialize Spread event handling system*/
 	E_init();
@@ -152,7 +155,7 @@ void print_display(){
 
 
 	printf("\nYou can do the following things:\n");
-	printf("\n1.Append\n2.Like\n3.Dislike\n3.Change user/login as other\n4.View servers\n5.View history\n");	
+	printf("\n1.Append (a <line>) \n2.Like (l <line_no>) \n3.Unlike (r <line_no>)\n4.Change user/login as other (u <username>) \n5.View servers (v) \n6.View history  (h) \n7. Connect (c <server_id>\n");	
 	printf("\nUser>");
 
 }
@@ -200,11 +203,11 @@ void leave_chatroom(client_variables* local_var){
 	int ret;
 	if(local_var->my_state == IN_CHATROOM){
 
-			
-		 char chatroom1[SIZE]="\0";
-		 strcat(chatroom1,local_var->my_chatroom->chatroom_name);
-		 strcat(chatroom1,public_server_grps[local_var->my_server]);
-		
+
+		char chatroom1[SIZE]="\0";
+		strcat(chatroom1,local_var->my_chatroom->chatroom_name);
+		strcat(chatroom1,public_server_grps[local_var->my_server]);
+
 
 
 		ret = SP_leave( Mbox, chatroom1);
@@ -306,7 +309,7 @@ void process_input(char* input, client_variables *local_var){
 				//
 				//
 
-				
+
 				/*ignoring your own narcissistic likes*/
 				int rt;
 				node *t = seek(local_var->my_chatroom->chatroom_msgs,line_lts, &rt);
@@ -316,25 +319,25 @@ void process_input(char* input, client_variables *local_var){
 				}
 				if(t == NULL){
 					t = local_var->my_chatroom->chatroom_msgs->head;
-				
+
 				}else{
 					t = t->next;
 				}
 
 				line* ln = (line *)t->data;
 
-				
+
 				if(strcmp(ln->line_content.line_packet_user, local_var->username) != 0 ){
 
-				
-				create_packet(LIKE, "\0", line_lts, local_var);
-				refresh_screen(local_var);
+
+					create_packet(LIKE, "\0", line_lts, local_var);
+					refresh_screen(local_var);
 
 				}else{
-				refresh_screen(local_var);
-				printf("\nYou cannot like your own Message!!\n");
+					refresh_screen(local_var);
+					printf("\nYou cannot like your own Message!!\n");
 
-				fflush(stdout);
+					fflush(stdout);
 				}
 			}
 			else{
@@ -682,8 +685,73 @@ static  void    Read_message(int a, int b, void *local_var_arg)
 				}
 			}else if( Is_caused_leave_mess( service_type ) ){
 				printf("Due to the LEAVE of %s\n", memb_info.changed_member );
+
+				int id;
+				char* str=strtok( memb_info.changed_member,"#");
+				char* integer=strtok(str,"s");
+				id=atoi(integer);
+
+				if(id == local_var->my_server==0){
+
+
+					int retw=SP_leave(Mbox,public_server_grps[local_var->my_server]);
+					if( retw < 0 ) SP_error( retw );
+
+					printf("\nDisconnected from the Server..Connect to another server..(Usage : c <server_id>\n");
+
+					if(local_var->my_state==CONNECTED){
+
+						local_var->my_state=NOT_CONNECTED;
+					}
+					else {
+
+						local_var->my_state=LOGGED_IN;
+
+					}
+
+					free(local_var->my_chatroom);
+					initialize_chatroom(local_var);
+
+					local_var->my_server=0;
+
+
+
+				}
 			}else if( Is_caused_disconnect_mess( service_type ) ){
 				printf("Due to the DISCONNECT of %s\n", memb_info.changed_member );
+
+				int id;
+				char* str=strtok( memb_info.changed_member,"#");
+				char* integer=strtok(str,"s");
+				id=atoi(integer);
+
+				
+
+				if(id==local_var->my_server){
+
+					int retw=SP_leave(Mbox,public_server_grps[local_var->my_server]);
+					if( retw < 0 ) SP_error( retw );
+
+					local_var->my_server=0;
+					printf("\nDisconnected from the Server..Connect to another server..(Usage : c <server_id>\n");
+
+					if(local_var->my_state==CONNECTED){
+
+						local_var->my_state=NOT_CONNECTED;
+					}
+					else {
+
+						local_var->my_state=LOGGED_IN;
+
+					}
+
+					free(local_var->my_chatroom);
+					initialize_chatroom(local_var);
+
+
+
+
+				}
 			}
 			else{
 
@@ -772,7 +840,7 @@ void process_message(char* mess,client_variables *local_var){
 				i++;
 
 			}
-			
+
 			refresh_screen(local_var);
 
 			break;
@@ -784,17 +852,17 @@ void process_message(char* mess,client_variables *local_var){
 				node *new_user=create_meta(new_response->data.users[0]);
 				append(local_var->my_chatroom->users,new_user);
 			}
-			
+
 			refresh_screen(local_var);
 			break;
 		case R_LEAVE:
-;
+			;
 			int retval1;
 			node* to_del=seek_user(local_var->my_chatroom->users, new_response->data.users[0],&retval1);
 			if(retval1==1){
 				delete(local_var->my_chatroom->users,to_del);
 			}
-			
+
 			refresh_screen(local_var);
 
 			break;
@@ -852,8 +920,8 @@ void process_message(char* mess,client_variables *local_var){
 				insert(local_var->my_chatroom->chatroom_msgs, n1, prev);
 
 			}else{
-				
-			   	insert(local_var->my_chatroom->chatroom_msgs, n1, prev);		
+
+				insert(local_var->my_chatroom->chatroom_msgs, n1, prev);		
 				//append(local_var->my_chatroom->chatroom_msgs,n1);
 				local_var->my_chatroom->counter++;
 				if(local_var->my_chatroom->counter ==LINES_ON_SCREEN){
@@ -863,28 +931,28 @@ void process_message(char* mess,client_variables *local_var){
 
 				}else if(local_var->my_chatroom->counter>LINES_ON_SCREEN){
 
-					 line * l_a = (line*) local_var->my_chatroom->start->data;
-					 LTS of_start = l_a->line_content.line_packet_lts;
+					line * l_a = (line*) local_var->my_chatroom->start->data;
+					LTS of_start = l_a->line_content.line_packet_lts;
 
-					 if( (new_response->data.line.line_packet_lts.LTS_counter > of_start.LTS_counter) || ( (new_response->data.line.line_packet_lts.LTS_counter == of_start.LTS_counter) && (new_response->data.line.line_packet_lts.LTS_server_id > of_start.LTS_server_id  )  )){
+					if( (new_response->data.line.line_packet_lts.LTS_counter > of_start.LTS_counter) || ( (new_response->data.line.line_packet_lts.LTS_counter == of_start.LTS_counter) && (new_response->data.line.line_packet_lts.LTS_server_id > of_start.LTS_server_id  )  )){
 
-					
 
-					printf("\nAlready reached MORE lines on screen\n");
-					local_var->my_chatroom->start=local_var->my_chatroom->start->next;
-					 }
+
+						printf("\nAlready reached MORE lines on screen\n");
+						local_var->my_chatroom->start=local_var->my_chatroom->start->next;
+					}
 
 				}
 			}
 			print_line(local_var->my_chatroom->chatroom_msgs);
-			
+
 			refresh_screen(local_var);
 
 			break;
 		case R_VIEW: /*Got list of servers, need to show to screen*/
 			;     
 			int k=1;
-			
+
 			refresh_screen(local_var);
 			printf("\nServers in current partition are: \t");
 			while(k<6){
