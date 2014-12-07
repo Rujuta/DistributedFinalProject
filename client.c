@@ -303,8 +303,39 @@ void process_input(char* input, client_variables *local_var){
 				LTS line_lts;
 				line_lts=get_LTS(local_var,line_no);
 				//create LTS structre here
+				//
+				//
+
+				
+				/*ignoring your own narcissistic likes*/
+				int rt;
+				node *t = seek(local_var->my_chatroom->chatroom_msgs,line_lts, &rt);
+				if(debug){
+					printf("\n---in like ---");
+
+				}
+				if(t == NULL){
+					t = local_var->my_chatroom->chatroom_msgs->head;
+				
+				}else{
+					t = t->next;
+				}
+
+				line* ln = (line *)t->data;
+
+				
+				if(strcmp(ln->line_content.line_packet_user, local_var->username) != 0 ){
+
+				
 				create_packet(LIKE, "\0", line_lts, local_var);
 				refresh_screen(local_var);
+
+				}else{
+				refresh_screen(local_var);
+				printf("\nYou cannot like your own Message!!\n");
+
+				fflush(stdout);
+				}
 			}
 			else{
 				printf("\nYou need to be in a chatroom to like\n");
