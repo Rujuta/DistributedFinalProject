@@ -512,3 +512,28 @@ void print_meta(linked_list *meta_ll){
 	}
 
 }
+
+
+void print_update(linked_list *update_ll){
+
+	printf("\n In print update list\n");
+	node *temp=update_ll->head;
+	printf("\nYour list is:\n");
+	while(temp!=NULL){
+		update* my_data2=(update*)temp->data;
+
+		printf("\nPrinting update msg's data\n");
+		
+		printf("\nUpdate LTS counter:%d Server ID:%d",my_data2->update_lts.LTS_counter,my_data2->update_lts.LTS_server_id);
+		printf("\nUpdate is in chat room:%s",my_data2->update_chat_room);
+				
+		switch(my_data2->update_type){
+			case LIKE:
+			printf("\nUpdate LTS counter :%d, LTS server id: %d",my_data2->update_data.data_like.like_packet_line_no_lts.LTS_counter, my_data2->update_data.data_like.like_packet_line_no_lts.LTS_server_id);
+				printf("\nUser sending update:%s",my_data2->update_data.data_like.like_packet_user);
+				break;
+
+		}
+		temp=temp->next;
+	}
+}
