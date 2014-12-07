@@ -214,9 +214,14 @@ node* seek(linked_list *list, LTS lts , int *ret_val){
 
 					//check if this is the first node
 					if(temp==list->head){
+						printf("\n RETURNING NULL\n");
+						fflush(stdout);
 						return NULL;
 					}
 					else{
+
+						printf("\nReturning valid node\n");
+						fflush(stdout);
 						return prev;	
 					}
 				}
@@ -329,7 +334,9 @@ node* seek(linked_list *list, LTS lts , int *ret_val){
 	}
 	if(debug){
 		printf("\n returning tail");
+		fflush(stdout);
 	}
+	
 	return list->tail;
 
 }

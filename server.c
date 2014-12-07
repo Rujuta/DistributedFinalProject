@@ -1394,10 +1394,10 @@ int check_causality(server_variables* local_var,update* update_packet){
 
 
 
-			line* lp= (line*)lp1->data;
 			/*Line has been found*/
 			if(ret==1){
 
+				line* lp= (line*)lp1->data;
 				if(update_packet->update_type==LIKE){
 
 					if(debug){
@@ -1498,7 +1498,7 @@ void process_update(char* mess, server_variables *local_var, int send_flag){
 		int flag;
 
 		if(send_flag == 1){
-			flag= 1;//check_causality(local_var,update_packet);
+			flag= check_causality(local_var,update_packet);
 		}else{
 
 			flag =1;
@@ -1507,9 +1507,21 @@ void process_update(char* mess, server_variables *local_var, int send_flag){
 
 		if(flag==0){
 			/*Causally dependent*/
+			/*Remove from undelivered*/
+			int ret_val10;
+			node* to_del=seek(local_var->undelivered_update_list,update_packet->update_lts, &ret_val10);
+			if(ret_val10!=1){ //in undelivered
 
+				if(debug){
+					printf("\n NOT APPENDING TO undelivered msg with LTS counter: %d server id: %d", update_packet->update_lts.LTS_counter,update_packet->update_lts.LTS_server_id);
+
+					fflush(stdout);
+				}
+				
 
 			append(local_var->undelivered_update_list,new_update);
+
+			}
 		}
 		else{
 			int r;
@@ -1523,18 +1535,18 @@ void process_update(char* mess, server_variables *local_var, int send_flag){
 					write_to_file(local_var,update_packet);
 				}
 				/*Remove from undelivered*/
-				/*	int ret_val10;
-					node* to_del=seek(local_var->undelivered_update_list,update_packet->update_lts, &ret_val10);
-					if(ret_val10==1){ //in undelivered
+				int ret_val10;
+				node* to_del=seek(local_var->undelivered_update_list,update_packet->update_lts, &ret_val10);
+				if(ret_val10==1){ //in undelivered
 
 					if(debug){
-					printf("\n Deleting to_del undelivered msg with LTS counter: %d server id: %d", update_packet->update_lts.LTS_counter,update_packet->update_lts.LTS_server_id);
+						printf("\n Deleting to_del undelivered msg with LTS counter: %d server id: %d", update_packet->update_lts.LTS_counter,update_packet->update_lts.LTS_server_id);
 
-					fflush(stdout);
+						fflush(stdout);
 					}
 					delete(local_var->undelivered_update_list,to_del);
 
-					}*/
+				}
 			}
 
 			/*Update my local LTS */
@@ -1614,30 +1626,30 @@ void process_update(char* mess, server_variables *local_var, int send_flag){
 
 
 			/*since message has just been delivered, check if you can deliver any other msgs */
-			/*			if(!is_empty(local_var->undelivered_update_list)){
+			if(!is_empty(local_var->undelivered_update_list)){
 
-						if(debug){
+				if(debug){
 
-						printf("\nThere are undelivered MSGS, PROCESSING THEM\n");
-						fflush(stdout);
-						}
-						node* temp=local_var->undelivered_update_list->head;
-						while(temp!=NULL){
-						update* old_update=(update*)temp->data;
+					printf("\nThere are undelivered MSGS, PROCESSING THEM\n");
+					fflush(stdout);
+				}
+				node* temp=local_var->undelivered_update_list->head;
+				while(temp!=NULL){
+					update* old_update=(update*)temp->data;
 
-						process_update((char*)old_update,local_var,send_flag );
+					process_update((char*)old_update,local_var,send_flag );
 
-						temp=temp->next;
-						}
+					temp=temp->next;
+				}
 
 
-						if(debug){
+				if(debug){
 
-						printf("\nexiting undelivered MSGS,  \n");
-						fflush(stdout);
-						}
+					printf("\nexiting undelivered MSGS,  \n");
+					fflush(stdout);
+				}
 
-						}*/
+			}
 
 		}
 	}
