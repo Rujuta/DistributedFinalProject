@@ -1,7 +1,7 @@
 #include "sp.h"
 #include "structures.h"
 #define SPREAD_PORT "10150"
-#define debug 1
+#define debug 0
 
 #define MAX_MESSLEN     102400
 #define MAX_VSSETS      10
@@ -344,7 +344,7 @@ void reconcile_merge(server_variables *local_var){
 			if(my_min>local_var->recvd_vectors[l][local_var->machine_id]){
 				my_min=local_var->recvd_vectors[l][local_var->machine_id];
 
-				printf("\nrecvd vector for server  %d is: %d\n", l,local_var->recvd_vectors[l][local_var->machine_id]);
+				//printf("\nrecvd vector for server  %d is: %d\n", l,local_var->recvd_vectors[l][local_var->machine_id]);
 			}
 		}
 
@@ -580,7 +580,7 @@ void connect_to_spread(server_variables *local_var){
 		SP_error( ret );
 		Bye();
 	}
-	printf("User: connected to %s with private group %s\n", Spread_name, Private_group,local_var->timeout );
+	//printf("User: connected to %s with private group %s\n", Spread_name, Private_group,local_var->timeout );
 	sprintf(local_var->private_group,Private_group);
 
 	if(debug){
@@ -650,7 +650,7 @@ void send_packet(char *group_name, response_packet *packet, server_variables *lo
 		Bye();
 	}
 
-	printf("\nLeaving send\n");
+	//printf("\nLeaving send\n");
 }
 
 
@@ -707,7 +707,7 @@ static  void    Read_message(int a, int b, void *local_var_arg)
 	if( ret < 0 )
 	{
 
-		printf("\nReturn Value :%d");
+		//printf("\nReturn Value :%d");
 
 		if(debug){
 			fprintf(log1,"\nIn error 1");
@@ -743,7 +743,7 @@ static  void    Read_message(int a, int b, void *local_var_arg)
 					sender, mess_type,  ret );
 		}
 		if(strcmp(target_groups[0],SERVER_GRP)==0){
-			printf("\nGot update");
+			//printf("\nGot update");
 			process_update(mess,local_var,1);
 		}
 		else{
@@ -810,7 +810,7 @@ static  void    Read_message(int a, int b, void *local_var_arg)
 			{
 				printf("\nDue to join of  %s\n",  memb_info.changed_member);
 				fprintf(log1,"Due to the JOIN of %s\n", memb_info.changed_member );
-				printf("\nGroup joined: %s",sender);
+				//printf("\nGroup joined: %s",sender);
 
 				if(strcmp(sender,SERVER_GRP)==0){
 					//init counter that keeps track of no of local vectors received
@@ -865,7 +865,7 @@ static  void    Read_message(int a, int b, void *local_var_arg)
 					if(num_vs_sets==1){
 
 
-						printf("\n\n*****__________Calling RECONCILE PARTITION_______****\n\n");
+						//printf("\n\n*****__________Calling RECONCILE PARTITION_______****\n\n");
 						/*If num_vs_sets == 1 it is a LEAVE or partition creation*/
 						int p;
 						for(p=1;p<6;p++){
@@ -1307,7 +1307,7 @@ chatroom* process_join(char* group, server_variables *local_var, char* user, int
 		if(debug){
 			printf("\n-------------PRINTING from join process AFTER joining------------------\n");
 		}
-		print_meta(my_data3->users);
+		//print_meta(my_data3->users);
 
 
 	}
@@ -1412,7 +1412,7 @@ int check_causality(server_variables* local_var,update* update_packet){
 					/*Search for users to see if user matches*/
 
 					int ret_val2;
-					print_meta(lp->line_meta);
+					//print_meta(lp->line_meta);
 					node* user=seek_user(lp->line_meta, update_packet->update_data.data_like.like_packet_user,&ret_val2);
 					if(ret_val2==1){
 
@@ -1699,17 +1699,17 @@ line_packet process_append(server_variables *local_var,char *croom1, char* user,
 
 	node* prev;
 	int ret_val;
-	printf("\nGot msg of type append\n");
+	//printf("\nGot msg of type append\n");
 	//Here need to find out the user is part of which chat room
 	//Append to that chat room
 	//From message, the chatroom data is obtained
 	if(debug){
 		printf("\nGoing to seek chatroom %s\n",croom1);
 	}
-	print_chatlist(local_var->chat_lists);
+	//print_chatlist(local_var->chat_lists);
 	fflush(stdout);
 	prev=seek_chatroom(local_var->chat_lists,croom1,&ret_val);
-	printf("\n ret val --%d ",ret_val);
+	//printf("\n ret val --%d ",ret_val);
 	chatroom *croom;
 	fflush(stdout);
 	line* my_data2;
@@ -1738,7 +1738,7 @@ line_packet process_append(server_variables *local_var,char *croom1, char* user,
 
 			insert(chat_list, new_line, loc);
 		}
-		print_line(chat_list);
+		//print_line(chat_list);
 		//print_chatlist(local_var->chat_lists);
 		/*Now send the same msg back to all clients in group so that they can refresh screen*/
 
@@ -1845,8 +1845,9 @@ void process_message(char* mess,char* sender, server_variables *local_var){
 				send_packet(recv_packet->request_packet_chatroom,rp,local_var,0);
 			}
 			break;
-		case JOIN: printf("\nGot a message of join");
-			   printf("\nRequest to join chat room: %s",recv_packet->request_packet_data);
+		case JOIN: //printf("\nGot a message of join");
+			   //printf("\nRequest to join chat room: %s",recv_packet->request_packet_data);
+			   ;
 			   char group[SIZE]="\0";
 			   sscanf(recv_packet->request_packet_data,"%s",group);
 			   local_var->my_lts.LTS_counter++;

@@ -23,7 +23,7 @@
 #define MAX_VSSETS      10
 #define MAX_MEMBERS     100
 #define SIZE 80
-#define LINES_ON_SCREEN 3
+#define LINES_ON_SCREEN 25
 
 
 

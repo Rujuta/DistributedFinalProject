@@ -1,7 +1,7 @@
 #include "sp.h"
 #include "structures.h"
 
-#define debug 1
+#define debug 0
 #define clear() printf("\033[H\033[J")
 
 
@@ -142,7 +142,7 @@ void connect_to_spread(client_variables *local_var){
 		SP_error( ret );
 		Bye();
 	}
-	printf("User: connected to %s with private group %s\n", Spread_name, Private_group,local_var->timeout );
+//	printf("User: connected to %s with private group %s\n", Spread_name, Private_group,local_var->timeout );
 	sprintf(local_var->private_group,Private_group);
 
 	if(debug){
@@ -227,6 +227,8 @@ void leave_chatroom(client_variables* local_var){
 
 	}
 }
+
+/*This function receives user input and calls the create packet function that creates and sends a packet of type <request> to server*/
 void process_input(char* input, client_variables *local_var){
 
 	int ret;
@@ -416,7 +418,7 @@ void process_input(char* input, client_variables *local_var){
 	}
 
 }
-
+/*Returns the LTS of a line number on screen that was liked/unliked*/
 LTS get_LTS(client_variables *local_var,int line_no_liked){
 
 	node *temp;
@@ -473,7 +475,7 @@ void refresh_screen(client_variables *local_var){
 	}
 	node *temp;
 
-	print_line(local_var->my_chatroom->chatroom_msgs);
+	//print_line(local_var->my_chatroom->chatroom_msgs);
 
 	if(local_var->my_chatroom->start == NULL){
 
@@ -526,6 +528,11 @@ static  void    Assign(char *argv[])
 	if(debug){
 		printf("in assign");
 	}
+
+//	struct timeval val;
+//	gettimeofday(&val, NULL);
+//	sprintf(User, "%ld\n", (val.tv_sec));
+
 	strcat(User,"cl");
 	strcat( User, argv[1] );
 	if(debug){
@@ -538,7 +545,7 @@ static  void    Assign(char *argv[])
 
 static void Usage(){
 
-	printf("\nUsage: <client_id>\n");
+	printf("\nUsage: client\n");
 	exit(1);
 }
 
@@ -684,7 +691,7 @@ static  void    Read_message(int a, int b, void *local_var_arg)
 					fflush(stdout);
 				}
 			}else if( Is_caused_leave_mess( service_type ) ){
-				printf("Due to the LEAVE of %s\n", memb_info.changed_member );
+				//printf("Due to the LEAVE of %s\n", memb_info.changed_member );
 
 				int id;
 				char* str=strtok( memb_info.changed_member,"#");
@@ -718,7 +725,7 @@ static  void    Read_message(int a, int b, void *local_var_arg)
 
 				}
 			}else if( Is_caused_disconnect_mess( service_type ) ){
-				printf("Due to the DISCONNECT of %s\n", memb_info.changed_member );
+				//printf("Due to the DISCONNECT of %s\n", memb_info.changed_member );
 
 				int id;
 				char* str=strtok( memb_info.changed_member,"#");
@@ -762,21 +769,21 @@ static  void    Read_message(int a, int b, void *local_var_arg)
 
 		}
 		else if( Is_transition_mess(   service_type ) ) {
-			printf("received TRANSITIONAL membership for group %s\n", sender );
+			//printf("received TRANSITIONAL membership for group %s\n", sender );
 		}
 		else if( Is_caused_leave_mess( service_type ) ){
-			printf("received membership message that left group %s\n", sender );
+			//printf("received membership message that left group %s\n", sender );
 		}
-		else printf("received incorrecty membership message of type 0x%x\n", service_type );
+		else {}//printf("received incorrecty membership message of type 0x%x\n", service_type );
 	}
 
 
 	else if ( Is_reject_mess( service_type ) )
 	{
-		printf("REJECTED message from %s, of servicetype 0x%x messtype %d, (endian %d) to %d groups \n(%d bytes): %s\n",
-				sender, service_type, mess_type, endian_mismatch, num_groups, ret, mess );
+		//printf("REJECTED message from %s, of servicetype 0x%x messtype %d, (endian %d) to %d groups \n(%d bytes): %s\n",
+				//sender, service_type, mess_type, endian_mismatch, num_groups, ret, mess );
 	}
-	else printf("received message of unknown message type 0x%x with ret %d\n", service_type, ret);
+	else {}//printf("received message of unknown message type 0x%x with ret %d\n", service_type, ret);
 
 
 
@@ -925,7 +932,7 @@ void process_message(char* mess,client_variables *local_var){
 				//append(local_var->my_chatroom->chatroom_msgs,n1);
 				local_var->my_chatroom->counter++;
 				if(local_var->my_chatroom->counter ==LINES_ON_SCREEN){
-					printf("\nAlready reached lines on screen\n");
+					//printf("\nAlready reached lines on screen\n");
 					local_var->my_chatroom->start=local_var->my_chatroom->chatroom_msgs->head;
 					//printf("\nData in start: %d", )
 
@@ -938,13 +945,13 @@ void process_message(char* mess,client_variables *local_var){
 
 
 
-						printf("\nAlready reached MORE lines on screen\n");
+						//printf("\nAlready reached MORE lines on screen\n");
 						local_var->my_chatroom->start=local_var->my_chatroom->start->next;
 					}
 
 				}
 			}
-			print_line(local_var->my_chatroom->chatroom_msgs);
+			//print_line(local_var->my_chatroom->chatroom_msgs);
 
 			refresh_screen(local_var);
 
