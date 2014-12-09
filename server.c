@@ -821,7 +821,8 @@ static  void    Read_message(int a, int b, void *local_var_arg)
 					/*Reinit received vectors matrix*/
 					int k,w;
 					for(k=0;k<6;k++){
-
+						
+					local_var->merge_vector[k]=0; //initializing merge vector to keep track of recvd vectors
 						for(w=0;w<6;w++)
 							local_var->recvd_vectors[k][w]=0;
 					}	
@@ -840,6 +841,7 @@ static  void    Read_message(int a, int b, void *local_var_arg)
 				if(strcmp(sender,SERVER_GRP)==0){
 					int p;
 					for(p=1;p<6;p++){
+
 
 						if(local_var->current_members[p]==0){
 
@@ -882,6 +884,7 @@ static  void    Read_message(int a, int b, void *local_var_arg)
 
 						//init counter that keeps track of no of local vectors received
 						local_var->vectors_cnt=1;
+						
 
 
 						//TODO set member ship ID here. 
@@ -889,7 +892,8 @@ static  void    Read_message(int a, int b, void *local_var_arg)
 						/*Reinit received vectors matrix*/
 						int k,w;
 						for(k=0;k<6;k++){
-
+							
+							local_var->merge_vector[k]=0; //initializing merge vector to keep track of recvd vectors
 							for(w=0;w<6;w++)
 								local_var->recvd_vectors[k][w]=0;
 						}	
@@ -1223,7 +1227,7 @@ void send_users(server_variables *local_var){
 			union_update_data jpacket;
 			memcpy(&jpacket,&(join_p1),sizeof(join_p1));
 			local_var->my_lts.LTS_counter++;
-			local_var->my_vector[local_var->machine_id]++;
+		//	local_var->my_vector[local_var->machine_id]++;
 
 
 			new_update=create_update(JOIN,local_var->my_lts,my_data->chatroom_name,jpacket);
@@ -1360,6 +1364,13 @@ int check_causality(server_variables* local_var,update* update_packet){
 	/*If type is of like
 	 * Check seek for an LTS in messages 
 	 * if LTS found - deliver it - return 1*/
+	if(debug){
+
+
+		printf("\n update packet LTS : counter: %d server id: %d\n",update_packet->update_lts.LTS_counter, update_packet->update_lts.LTS_server_id);
+		fflush(stdout);
+
+	}
 	if(update_packet->update_type==LIKE || update_packet->update_type==UNLIKE){
 
 		int ret_val;
@@ -1521,7 +1532,7 @@ void process_update(char* mess, server_variables *local_var, int send_flag){
 			if(ret_val10!=1){ //in undelivered
 
 				if(debug){
-					printf("\n NOT APPENDING TO undelivered msg with LTS counter: %d server id: %d", update_packet->update_lts.LTS_counter,update_packet->update_lts.LTS_server_id);
+					printf("\n APPENDING TO undelivered msg with LTS counter: %d server id: %d", update_packet->update_lts.LTS_counter,update_packet->update_lts.LTS_server_id);
 
 					fflush(stdout);
 				}
@@ -1542,6 +1553,17 @@ void process_update(char* mess, server_variables *local_var, int send_flag){
 				if(send_flag==1){
 					write_to_file(local_var,update_packet);
 				}
+
+
+
+                        /*Update my local LTS */
+                        if(debug){
+
+                                printf("\nGoing to update my LTS now for server: %d with counter: %d", update_packet->update_lts.LTS_server_id,update_packet->update_lts.LTS_counter);
+                                fflush(stdout);
+                        }
+                        local_var->my_vector[update_packet->update_lts.LTS_server_id]=update_packet->update_lts.LTS_counter;
+
 				/*Remove from undelivered*/
 				int ret_val10;
 				node* to_del=seek(local_var->undelivered_update_list,update_packet->update_lts, &ret_val10);
@@ -1557,13 +1579,7 @@ void process_update(char* mess, server_variables *local_var, int send_flag){
 				}
 			}
 
-			/*Update my local LTS */
-			if(debug){
-
-				printf("\nGoing to update my LTS now for server: %d with counter: %d", update_packet->update_lts.LTS_server_id,update_packet->update_lts.LTS_counter);
-				fflush(stdout);
-			}
-			local_var->my_vector[update_packet->update_lts.LTS_server_id]=update_packet->update_lts.LTS_counter;
+		
 			/*Adapt to new LTS counter*/
 			if(update_packet->update_lts.LTS_counter > local_var->my_lts.LTS_counter){
 				local_var->my_lts.LTS_counter=update_packet->update_lts.LTS_counter;
@@ -1679,9 +1695,15 @@ void process_update(char* mess, server_variables *local_var, int send_flag){
 
 		/*TODO : ONLY when current memb ID`*/
 
-		int k;
-		local_var->vectors_cnt++;
+		if(debug){
 
+			printf("\nIn processing merge packet, for source id :%d....the merge vector for incoming ID is %d and vectors count is %d\n",update_packet->update_data.data_merge.source_id, local_var->merge_vector[update_packet->update_data.data_merge.source_id], local_var->vectors_cnt);
+
+}
+		int k;
+		int incoming_id=update_packet->update_data.data_merge.source_id;
+		if(local_var->merge_vector[incoming_id]!=1){
+		
 		for(k=1;k<6;k++){
 
 			local_var->recvd_vectors[update_packet->update_data.data_merge.source_id][k]=update_packet->update_data.data_merge.vector[k];
@@ -1692,6 +1714,9 @@ void process_update(char* mess, server_variables *local_var, int send_flag){
 			printf("\n Count of local vec: %d - total members: %d \n",local_var->vectors_cnt,local_var->total_members);
 			fflush(stdout);
 		}
+		
+		local_var->vectors_cnt++;
+		local_var->merge_vector[incoming_id]=1;	
 		if(local_var->vectors_cnt==local_var->total_members){
 
 			reconcile_merge(local_var);
@@ -1713,7 +1738,7 @@ void process_update(char* mess, server_variables *local_var, int send_flag){
 
 		}
 
-
+}
 	}
 }
 

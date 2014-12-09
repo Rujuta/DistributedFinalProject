@@ -194,6 +194,7 @@ typedef struct my_variables_server{
 	int total_members;
 	int vectors_cnt;
 	int current_memb_id;
+	int merge_vector[6];
 
 
  	
