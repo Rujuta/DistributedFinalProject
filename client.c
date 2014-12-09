@@ -142,7 +142,7 @@ void connect_to_spread(client_variables *local_var){
 		SP_error( ret );
 		Bye();
 	}
-//	printf("User: connected to %s with private group %s\n", Spread_name, Private_group,local_var->timeout );
+	//	printf("User: connected to %s with private group %s\n", Spread_name, Private_group,local_var->timeout );
 	sprintf(local_var->private_group,Private_group);
 
 	if(debug){
@@ -313,34 +313,46 @@ void process_input(char* input, client_variables *local_var){
 
 
 				/*ignoring your own narcissistic likes*/
-				int rt;
-				node *t = seek(local_var->my_chatroom->chatroom_msgs,line_lts, &rt);
-				if(debug){
-					printf("\n---in like ---");
 
+
+				if(line_lts.LTS_server_id !=-1){
+					int rt;
+					node *t = seek(local_var->my_chatroom->chatroom_msgs,line_lts, &rt);
+					if(debug){
+						printf("\n---in like ---");
+
+					}
+					if(t == NULL){
+						t = local_var->my_chatroom->chatroom_msgs->head;
+
+					}else{
+						t = t->next;
+					}
+
+					line* ln = (line *)t->data;
+
+
+					if(strcmp(ln->line_content.line_packet_user, local_var->username) != 0 ){
+
+
+						create_packet(LIKE, "\0", line_lts, local_var);
+						refresh_screen(local_var);
+
+					}else{
+						refresh_screen(local_var);
+						printf("\nYou cannot like your own Message!!\n");
+
+						fflush(stdout);
+					}
+
+				}else
+				{
+					if(debug){
+						printf("\n Get lts returned -1\n");
+					
+					}
 				}
-				if(t == NULL){
-					t = local_var->my_chatroom->chatroom_msgs->head;
 
-				}else{
-					t = t->next;
-				}
-
-				line* ln = (line *)t->data;
-
-
-				if(strcmp(ln->line_content.line_packet_user, local_var->username) != 0 ){
-
-
-					create_packet(LIKE, "\0", line_lts, local_var);
-					refresh_screen(local_var);
-
-				}else{
-					refresh_screen(local_var);
-					printf("\nYou cannot like your own Message!!\n");
-
-					fflush(stdout);
-				}
 			}
 			else{
 				printf("\nYou need to be in a chatroom to like\n");
@@ -426,6 +438,20 @@ LTS get_LTS(client_variables *local_var,int line_no_liked){
 		printf("\nIn get lts\n");
 		fflush(stdout);
 	}
+
+
+	if(line_no_liked < 1 || line_no_liked > LINES_ON_SCREEN){
+
+		printf("\n Please make a Valid Selection. You can only slect one of the visible lines\n");
+
+		LTS ret;
+		ret.LTS_counter = -1;
+		ret.LTS_server_id = -1;
+		return ret;
+	}
+
+
+
 	if(local_var->my_chatroom->start == NULL){
 		temp=local_var->my_chatroom->chatroom_msgs->head;
 
@@ -460,6 +486,15 @@ LTS get_LTS(client_variables *local_var,int line_no_liked){
 	}
 
 	printf("\nPlease make a valid line selection, no line matched!");
+
+
+	// Returning a negative LTS to indicate line not found
+	LTS ret;
+	ret.LTS_counter =-1;
+	ret.LTS_server_id = -1;
+
+	return ret;
+
 
 
 }
@@ -529,9 +564,9 @@ static  void    Assign(char *argv[])
 		printf("in assign");
 	}
 
-//	struct timeval val;
-//	gettimeofday(&val, NULL);
-//	sprintf(User, "%ld\n", (val.tv_sec));
+	//	struct timeval val;
+	//	gettimeofday(&val, NULL);
+	//	sprintf(User, "%ld\n", (val.tv_sec));
 
 	strcat(User,"cl");
 	strcat( User, argv[1] );
@@ -732,7 +767,7 @@ static  void    Read_message(int a, int b, void *local_var_arg)
 				char* integer=strtok(str,"s");
 				id=atoi(integer);
 
-				
+
 
 				if(id==local_var->my_server){
 
@@ -781,7 +816,7 @@ static  void    Read_message(int a, int b, void *local_var_arg)
 	else if ( Is_reject_mess( service_type ) )
 	{
 		//printf("REJECTED message from %s, of servicetype 0x%x messtype %d, (endian %d) to %d groups \n(%d bytes): %s\n",
-				//sender, service_type, mess_type, endian_mismatch, num_groups, ret, mess );
+		//sender, service_type, mess_type, endian_mismatch, num_groups, ret, mess );
 	}
 	else {}//printf("received message of unknown message type 0x%x with ret %d\n", service_type, ret);
 
