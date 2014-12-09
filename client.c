@@ -155,7 +155,7 @@ void print_display(){
 
 
 	printf("\nYou can do the following things:\n");
-	printf("\n1.Append (a <line>) \n2.Like (l <line_no>) \n3.Unlike (r <line_no>)\n4.Change user/login as other (u <username>) \n5.View servers (v) \n6.View history  (h) \n7. Connect (c <server_id>\n");	
+	printf("\n1.] Append (a <line>) \n2.] Like (l <line_no>) \n3.] Unlike (r <line_no>)\n4.] Change user/login as other (u <username>) \n5.] View servers (v) \n6.] View history  (h) \n7.] Connect (c <server_id>\n8.] Join (j <Chatroom name>)\n");	
 	printf("\nUser>");
 
 }

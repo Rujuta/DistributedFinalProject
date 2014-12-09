@@ -1778,6 +1778,10 @@ line_packet process_append(server_variables *local_var,char *croom1, char* user,
 			SP_error( ret );
 			Bye();
 		}
+		
+		response_packet *line_p= create_response_packet(R_MSG,local_var);
+                my_data2=(line*) new_line->data;
+                memcpy(&(line_p->data),&(my_data2->line_content),sizeof(line_packet));
 
 
 
