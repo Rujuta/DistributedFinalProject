@@ -1223,6 +1223,9 @@ void send_users(server_variables *local_var){
 			union_update_data jpacket;
 			memcpy(&jpacket,&(join_p1),sizeof(join_p1));
 			local_var->my_lts.LTS_counter++;
+			local_var->my_vector[local_var->machine_id]++;
+
+
 			new_update=create_update(JOIN,local_var->my_lts,my_data->chatroom_name,jpacket);
 
 
@@ -1432,7 +1435,7 @@ int check_causality(server_variables* local_var,update* update_packet){
 
 						if(debug){
 
-							printf("\n Returns 0  as msg is user who liked doesn't exist, so can't unlike  : user is :%s\n",update_packet->update_data.data_like.like_packet_user);
+							printf("\n Returns 0  as msg is user who liked doesn't exist, so can't unlike  : user is :%s....lts serverid %d.....counter....%d\n",update_packet->update_data.data_like.like_packet_user, line_lts.LTS_server_id, line_lts.LTS_counter);
 						}	
 						return 0;
 					}
@@ -1460,6 +1463,12 @@ int check_causality(server_variables* local_var,update* update_packet){
 			}
 			return 0;
 		}
+
+		
+        
+
+
+
 	}
 	else{
 
@@ -1468,16 +1477,10 @@ int check_causality(server_variables* local_var,update* update_packet){
 			printf("\n Returns 1 as msg is NOT of type LIKE / UNLIKE \n");
 		}	
 		return 1;
+
 	}
 
-	/*If type is unlike, check if like for the line exists
-	 * if so, return 1 else 0*/
 
-
-	if(debug){
-		printf("\nLeaving check causaloty\n");
-		fflush(stdout);
-	}
 
 
 
@@ -1485,7 +1488,8 @@ int check_causality(server_variables* local_var,update* update_packet){
 
 /*When send_flag == 1 this update needs to be sent to my users !!*/
 void process_update(char* mess, server_variables *local_var, int send_flag){
-
+	if(debug)	printf("\nEntering process update-----with send flag %d\n",send_flag);
+	
 	int ret;
 	update* update_packet;
 	update_packet=(update*)mess;
@@ -1494,6 +1498,10 @@ void process_update(char* mess, server_variables *local_var, int send_flag){
 	node* new_update=create_update(update_packet->update_type, update_packet->update_lts, update_packet->update_chat_room,update_packet->update_data);
 
 	if(update_packet->update_type!=MERGE){
+
+		int add;
+		node *is_pres = seek(local_var->update_list,update_packet->update_lts,&add);
+		if(add !=1){
 		/*Do causality check*/
 		int flag;
 
@@ -1507,7 +1515,7 @@ void process_update(char* mess, server_variables *local_var, int send_flag){
 
 		if(flag==0){
 			/*Causally dependent*/
-			/*Remove from undelivered*/
+			
 			int ret_val10;
 			node* to_del=seek(local_var->undelivered_update_list,update_packet->update_lts, &ret_val10);
 			if(ret_val10!=1){ //in undelivered
@@ -1631,12 +1639,17 @@ void process_update(char* mess, server_variables *local_var, int send_flag){
 				if(debug){
 
 					printf("\nThere are undelivered MSGS, PROCESSING THEM\n");
+					print_update(local_var->undelivered_update_list);
 					fflush(stdout);
 				}
 				node* temp=local_var->undelivered_update_list->head;
 				while(temp!=NULL){
 					update* old_update=(update*)temp->data;
+					if(debug){
 
+
+						printf("\nPrinting send flag in undelivered msgs : %d\n",send_flag);
+}
 					process_update((char*)old_update,local_var,send_flag );
 
 					temp=temp->next;
@@ -1650,9 +1663,18 @@ void process_update(char* mess, server_variables *local_var, int send_flag){
 				}
 
 			}
+			if(debug){
+			printf("\n-------------------Printing Update list after the update-------------------\n");
+			print_update(local_var->update_list);
 
+				
+			}
 		}
-	}
+	
+
+
+}
+}
 	else{  /*Processing merge packet*/
 
 		/*TODO : ONLY when current memb ID`*/
@@ -1731,7 +1753,7 @@ line_packet process_append(server_variables *local_var,char *croom1, char* user,
 		node* loc=seek(chat_list, line_lts, &ret_val3);
 		if(ret_val3==1){
 
-			printf("\nLIne found, duplicating ???\n");
+			printf("\nLIne found, duplicating ??? ...server id --  %d  ... counter --%d\n", line_lts.LTS_server_id, line_lts.LTS_counter);
 
 		}
 		else{

@@ -737,10 +737,23 @@ static  void    Read_message(int a, int b, void *local_var_arg)
 
 
 					int retw=SP_leave(Mbox,public_server_grps[local_var->my_server]);
+
 					if( retw < 0 ) SP_error( retw );
+
+					
 
 					printf("\nDisconnected from the Server..Connect to another server..(Usage : c <server_id>\n");
 
+					
+					if(local_var->my_state==IN_CHATROOM){
+					char chatroom1[SIZE]="\0";
+					strcat(chatroom1,local_var->my_chatroom->chatroom_name);
+					strcat(chatroom1,public_server_grps[local_var->my_server]);
+	
+					int retp=SP_leave(Mbox,public_server_grps[local_var->my_server]);
+
+					if( retp < 0 ) SP_error( retw );
+}
 					if(local_var->my_state==CONNECTED){
 
 						local_var->my_state=NOT_CONNECTED;
@@ -770,6 +783,18 @@ static  void    Read_message(int a, int b, void *local_var_arg)
 
 
 				if(id==local_var->my_server){
+
+										
+					if(local_var->my_state==IN_CHATROOM){
+					char chatroom1[SIZE]="\0";
+					strcat(chatroom1,local_var->my_chatroom->chatroom_name);
+					strcat(chatroom1,public_server_grps[local_var->my_server]);
+	
+					int retp=SP_leave(Mbox,public_server_grps[local_var->my_server]);
+
+					if( retp < 0 ) SP_error( retp );
+}
+
 
 					int retw=SP_leave(Mbox,public_server_grps[local_var->my_server]);
 					if( retw < 0 ) SP_error( retw );
