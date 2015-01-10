@@ -18,6 +18,7 @@ void recover(server_variables *local_var);
 
 void write_to_file(server_variables *local_var, update* update_packet);
 
+
 void send_users(server_variables *local_var);
 void send_my_updates(server_variables *local_var, int min);
 void create_merge_packet(server_variables *local_var);
