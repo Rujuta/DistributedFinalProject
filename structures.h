@@ -1,7 +1,6 @@
 #include "/home/cs437/exercises/ex3/include/sp.h"
 
 
-
 #include<stdio.h>
 #include<stdlib.h>
 #include <string.h>
