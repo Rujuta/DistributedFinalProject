@@ -1,12 +1,12 @@
 #include "sp.h"
 #include "structures.h"
-#define SPREAD_PORT "10150"
+
 #define debug 1
 
 #define MAX_MESSLEN     102400
 #define MAX_VSSETS      10
 #define MAX_MEMBERS     100
-#define SPREAD_PORT "10150"
+
 #define MAXINT 2147483647
 
 
