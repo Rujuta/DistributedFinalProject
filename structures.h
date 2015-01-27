@@ -1,4 +1,4 @@
-#include "/home/cs437/exercises/ex3/include/sp.h"
+#include "/home/rdeshpa3/ex3/include/sp.h"
 
 
 #include<stdio.h>
@@ -14,7 +14,7 @@
 #include <errno.h>
 #include <time.h>
 
-#define PORT         10150
+#define PORT         12000
 
 
 #define MAX_MESS_LEN 1400
