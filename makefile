@@ -1,8 +1,8 @@
 CC=gcc
 LD=gcc
 CFLAGS=-g
-CPPFLAGS=-I. -I/home/cs437/exercises/ex3/include
-SP_LIBRARY_DIR=/home/cs437/exercises/ex3
+CPPFLAGS=-I. -I/home/rdeshpa3/ex3/include
+SP_LIBRARY_DIR=/home/rdeshpa3/ex3
 
 DEPS=structures.h
 
